@@ -6,7 +6,7 @@ Ext.define("PortfolioAlignment", {
         {xtype: 'container', itemId: 'ct-header',cls: 'header', layout: {type: 'hbox'}},
         {xtype:'container',itemId:'ct-display', layout:{type: 'hbox'}},
         {xtype:'tsinfolink'}
-],
+    ],
     /**
      * TimeboxScopedApp settings
      */
@@ -46,19 +46,15 @@ Ext.define("PortfolioAlignment", {
         this.logger.log('scope changed',scope);
         this._updateApp();
     },
-    initComponent: function() {
-        this.callParent([]);
-      },
-    launch: function(){
-        this.callParent();
-
-        //if (this._hasScope()){
-        //    this.add({xtype: 'container', itemId: 'ct-header',cls: 'header', layout: {type: 'hbox'}});
-        //    this.add({xtype:'container',itemId:'ct-display', layout:{type: 'hbox'}});
-        //    this.add({xtype:'tsinfolink'});
-        //}
-
-        this.cbPortfolioItemType = this.getHeader().add({
+    _addComponents: function(){
+        if (this.getHeader()) {
+           // this.getHeader().layout = {type:'hbox'};
+        } else {
+            this.add({xtype: 'container', itemId: 'ct-header', cls: 'header', layout: {type: 'hbox'}});
+            this.add({xtype: 'container',itemId:'ct-display', layout:{type: 'hbox'}});
+            this.add({xtype: 'tsinfolink'});
+        }
+        this.cbPortfolioItemType = this.getHeader().add({  //getHeader()
             xtype: 'rallyportfolioitemtypecombobox',
             itemId: 'type-combo',
             fieldLabel: 'PortfolioItem Type',
@@ -80,7 +76,17 @@ Ext.define("PortfolioAlignment", {
             margin: 10,
             handler: this._buildTargetDialog
         });
+    },
+    initComponent: function() {
+        this.callParent([]);
+      },
+    launch: function(){
+        this.callParent();
+        this._addComponents();
 
+    },
+    getHeader: function() {
+        return this.down('container[cls=header]');
     },
     _updatePortfolioItemConfig: function(cb){
         var workspaceRef = this.getContext().getWorkspace()._ref;
