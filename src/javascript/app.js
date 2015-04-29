@@ -61,12 +61,24 @@ Ext.define("PortfolioAlignment", {
             labelWidth: 100,
             labelAlign: 'right',
             margin: 10,
+            storeConfig: {
+                sorters: [{
+                    property: 'Ordinal',
+                    direction: 'ASC'
+                }]
+            },
             listeners: {
                 scope: this,
-                ready: this._updatePortfolioItemConfig,
+                ready: function(cb) {
+                    var rec = cb.getStore().getAt(0);
+                    console.log(cb.getStore());
+                    cb.setValue(rec.get(cb.valueField));
+                    this.setDisabled(true);
+                    this._updatePortfolioItemConfig;
+                },
                 change: this._updatePortfolioItemConfig
-            },
-            disabled: true
+            }
+            //disabled: true
         });
 
         this.getHeader().add({
