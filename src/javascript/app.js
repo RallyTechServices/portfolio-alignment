@@ -73,7 +73,7 @@ Ext.define("PortfolioAlignment", {
                     var rec = cb.getStore().getAt(0);
                     console.log(cb.getStore());
                     cb.setValue(rec.get(cb.valueField));
-                    this.setDisabled(true);
+                    cb.setDisabled(true);
                     this._updatePortfolioItemConfig;
                 },
                 change: this._updatePortfolioItemConfig
