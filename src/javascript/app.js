@@ -2,7 +2,11 @@ Ext.define("PortfolioAlignment", {
     extend: 'Rally.app.TimeboxScopedApp',
     componentCls: 'app',
     logger: new Rally.technicalservices.Logger(),
-
+    items: [
+        {xtype: 'container', itemId: 'ct-header',cls: 'header', layout: {type: 'hbox'}},
+        {xtype:'container',itemId:'ct-display', layout:{type: 'hbox'}},
+        {xtype:'tsinfolink'}
+],
     /**
      * TimeboxScopedApp settings
      */
@@ -48,13 +52,11 @@ Ext.define("PortfolioAlignment", {
     launch: function(){
         this.callParent();
 
-        if (this._hasScope()){
-            this.add({xtype: 'container', itemId: 'ct-header',cls: 'header', layout: {type: 'hbox'}});
-        } else {
-            this.getHeader().layout = {type: 'hbox'};
-        }
-        this.add({xtype:'container',itemId:'ct-display', layout:{type: 'hbox'}});
-        this.add({xtype:'tsinfolink'});
+        //if (this._hasScope()){
+        //    this.add({xtype: 'container', itemId: 'ct-header',cls: 'header', layout: {type: 'hbox'}});
+        //    this.add({xtype:'container',itemId:'ct-display', layout:{type: 'hbox'}});
+        //    this.add({xtype:'tsinfolink'});
+        //}
 
         this.cbPortfolioItemType = this.getHeader().add({
             xtype: 'rallyportfolioitemtypecombobox',

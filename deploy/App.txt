@@ -3,11 +3,11 @@
 <head>
     <title>Portfolio Alignment</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Tue Apr 28 2015 08:21:08 GMT-0600 (MDT) -->
+    <!--  Build Date: Tue Apr 28 2015 21:25:42 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Tue Apr 28 2015 08:21:08 GMT-0600 (MDT)";
-        var CHECKSUM = 8813017029;
+        var APP_BUILD_DATE = "Tue Apr 28 2015 21:25:42 GMT-0600 (MDT)";
+        var CHECKSUM = 8975155403;
     </script>
     
     <script type="text/javascript" src="/apps/2.0/sdk.js"></script>
@@ -235,7 +235,11 @@ Ext.define("PortfolioAlignment", {
     extend: 'Rally.app.TimeboxScopedApp',
     componentCls: 'app',
     logger: new Rally.technicalservices.Logger(),
-
+    items: [
+        {xtype: 'container', itemId: 'ct-header',cls: 'header', layout: {type: 'hbox'}},
+        {xtype:'container',itemId:'ct-display', layout:{type: 'hbox'}},
+        {xtype:'tsinfolink'}
+],
     /**
      * TimeboxScopedApp settings
      */
@@ -281,13 +285,11 @@ Ext.define("PortfolioAlignment", {
     launch: function(){
         this.callParent();
 
-        if (this._hasScope()){
-            this.add({xtype: 'container', itemId: 'ct-header',cls: 'header', layout: {type: 'hbox'}});
-        } else {
-            this.getHeader().layout = {type: 'hbox'};
-        }
-        this.add({xtype:'container',itemId:'ct-display', layout:{type: 'hbox'}});
-        this.add({xtype:'tsinfolink'});
+        //if (this._hasScope()){
+        //    this.add({xtype: 'container', itemId: 'ct-header',cls: 'header', layout: {type: 'hbox'}});
+        //    this.add({xtype:'container',itemId:'ct-display', layout:{type: 'hbox'}});
+        //    this.add({xtype:'tsinfolink'});
+        //}
 
         this.cbPortfolioItemType = this.getHeader().add({
             xtype: 'rallyportfolioitemtypecombobox',
