@@ -4,7 +4,7 @@ Ext.define("PortfolioAlignment", {
     logger: new Rally.technicalservices.Logger(),
     items: [
         {xtype: 'container', itemId: 'ct-header',cls: 'header', layout: {type: 'hbox'}},
-        {xtype: 'container',itemId:'ct-display', layout:{type: 'hbox'}, height: 300},
+        {xtype: 'container',itemId:'ct-display', layout:{type: 'hbox'}},
         {xtype: 'container',
             itemId:'ct-legend',
             layout: {type: 'hbox', pack: 'center'} ,
@@ -171,6 +171,8 @@ Ext.define("PortfolioAlignment", {
             },
             chartConfig: config
         });
+
+        ct.setHeight(300);
     },
     _addLegend: function(){
 
@@ -274,12 +276,19 @@ Ext.define("PortfolioAlignment", {
         });
         return targetAllocationHash;
     },
-    _cleanTargetAllocationHash: function(hash, keyValues){
+    _cleanTargetAllocationHash: function(hash, values){
         var cleansedHash = {},
             noneText = this.chartSettings.noneText;
 
+        _.each(values, function(v){
+            if (v && v.length > 0) {
+                cleansedHash[v] = 0;
+            }
+        });
+        cleansedHash[noneText] = 0;
+
         _.each(hash, function(value, key){
-            if (Ext.Array.contains(keyValues, key)){
+            if (Ext.Array.contains(values, key)){
                 cleansedHash[key] = value;
             } else {
                 cleansedHash[noneText] = (cleansedHash[noneText] || 0) + value;
@@ -456,8 +465,8 @@ Ext.define("PortfolioAlignment", {
     },
     _getChartConfig: function(chartType){
             var title = this.chartSettings.getChartTitle(chartType),
-            toolTip = this.chartSettings.getToolTip(chartType, this.portfolioItemDisplayName),
-            noDataMessage = this.chartSettings.getNoDataMessage(chartType);
+                toolTip = this.chartSettings.getToolTip(chartType, this.portfolioItemDisplayName),
+                noDataMessage = this.chartSettings.getNoDataMessage(chartType);
 
         return {
             chart: {
@@ -477,8 +486,6 @@ Ext.define("PortfolioAlignment", {
                                 autoShow: true
                             });
                         });
-
-
 
                         var sum_vals = 0;
                         if (chart.series && chart.series[0] && chart.series[0].data){
@@ -511,7 +518,6 @@ Ext.define("PortfolioAlignment", {
                             crop: false,
                             overflow: 'none',
                             formatter: function(){
-
                                 if (this.percentage > 0){
                                     return this.percentage.toFixed(1) + '%';
                                 }
