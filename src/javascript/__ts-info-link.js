@@ -19,16 +19,16 @@ Ext.define('Rally.technicalservices.InfoLink',{
      * The title for the dialog box
      */
      title: "Build Information",
-    
-    renderTpl: "<div id='{id}-infolinkWrap' class='tsinfolink'>i</div>",
+
+     renderTpl: '<div class="tscenter"><div class="tsinfo">Data current as of {date}&nbsp;&nbsp;&nbsp;</div><div id="{id}-infolinkWrap" class="tsinfolink">&nbsp;i&nbsp;</div></div>',
 
     initComponent: function() {
         this.callParent(arguments);
-       
     },
     
     onRender: function() {
         this.callParent(arguments);
+
         this.mon(this.el,'click',this.onClick,this);
     },
     _generateChecksum: function(string){
