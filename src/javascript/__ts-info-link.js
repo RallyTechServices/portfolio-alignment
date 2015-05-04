@@ -78,7 +78,7 @@ Ext.define('Rally.technicalservices.InfoLink',{
                 
         dialog_items.push({
             xtype:'container',
-            html:"This app was created by the Rally Technical Services Team."
+            html:"This unsupported app was created by the Rally Technical Services Team."
         });
         
         if ( APP_BUILD_DATE ) {
