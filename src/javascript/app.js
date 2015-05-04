@@ -4,9 +4,16 @@ Ext.define("PortfolioAlignment", {
     logger: new Rally.technicalservices.Logger(),
     items: [
         {xtype: 'container', itemId: 'ct-header',cls: 'header', layout: {type: 'hbox'}},
-        {xtype:'container',itemId:'ct-display', layout:{type: 'hbox'}},
-        {xtype:'tsinfolink'}
-    ],
+        {xtype: 'container',itemId:'ct-display', layout:{type: 'hbox'}},
+        {xtype: 'container',
+            itemId:'ct-legend',
+            layout: {type: 'hbox', pack: 'center'} ,
+            padding: 10
+        },
+        {
+            xtype: 'tsinfolink',
+            renderData: {date: Rally.util.DateTime.formatWithDefaultDateTime(new Date())}
+        }],
     /**
      * TimeboxScopedApp settings
      */
@@ -17,27 +24,13 @@ Ext.define("PortfolioAlignment", {
         width: 300,
         margin: 10
     },
-
+    cursor: 'pointer',
     /**
      * PortfolioAlignment app settings
      */
-    defaultChartSize: 100,
-    defaults: { margin: 10 },
     portfolioItemFetchFields: ['Name','ObjectID','FormattedID','AcceptedLeafStoryPlanEstimateTotal','LeafStoryPlanEstimateTotal','PreliminaryEstimate','Value'],
-    plannedField: 'LeafStoryPlanEstimateTotal',
-    actualField: 'AcceptedLeafStoryPlanEstimateTotal',
-    noneText: 'None',
-    otherText: 'Other',
-    config: {
-        targetField: 'InvestmentCategory'
-    },
-    /**
-     * Tooltip text for the charts
-     */
-    targetTooltip: 'target tooltip',
-    plannedTooltip: 'planned tooltip',
-    scheduledTooltip: 'scheduled tooltip',
-    actualTooltip: 'actual tooltip',
+
+    chartSettings: null,
 
     onNoAvailableTimeboxes: function(){
         this.logger.log('No available releases');
@@ -50,11 +43,12 @@ Ext.define("PortfolioAlignment", {
         if (this.getHeader()) {
            // this.getHeader().layout = {type:'hbox'};
         } else {
-            this.add({xtype: 'container', itemId: 'ct-header', cls: 'header', layout: {type: 'hbox'}});
+            this.add({xtype: 'container',itemId:'ct-header', cls: 'header', layout: {type: 'hbox'}});
             this.add({xtype: 'container',itemId:'ct-display', layout:{type: 'hbox'}});
-            this.add({xtype: 'tsinfolink'});
+            this.add({xtype: 'container',itemId:'ct-legend', flex: 1, layout:{type: 'hbox', pack: 'center'}});
+            this.add({xtype: 'tsinfolink', data: {date: Rally.util.DateTime.formatWithDefaultDateTime(new Date())}});
         }
-        this.cbPortfolioItemType = this.getHeader().add({  //getHeader()
+        this.cbPortfolioItemType = this.getHeader().add({
             xtype: 'rallyportfolioitemtypecombobox',
             itemId: 'type-combo',
             fieldLabel: 'PortfolioItem Type',
@@ -72,37 +66,34 @@ Ext.define("PortfolioAlignment", {
                 ready: function(cb) {
                     var rec = cb.getStore().getAt(0);
                     cb.setValue(rec.get(cb.valueField));
-                    cb.setDisabled(true);
-                    this._updatePortfolioItemConfig(cb);
+                    cb.setDisabled(true);  //Temporary until we figure out how to handle parent portfolio item type
                 },
                 change: this._updatePortfolioItemConfig
             }
-            //disabled: true
         });
 
-        this.getHeader().add({
-            xtype: 'rallybutton',
-            text: 'Targets...',
-            scope: this,
-            margin: 10,
-            handler: this._buildTargetDialog
-        });
     },
     initComponent: function() {
         this.callParent([]);
-      },
+     },
     launch: function(){
         this.callParent();
+        this.chartSettings = Ext.create('Rally.technicalservices.PortfolioAlignmentSettings',{});
         this._addComponents();
-
-    },
+   },
     getHeader: function() {
         return this.down('container[cls=header]');
     },
     _updatePortfolioItemConfig: function(cb){
+        this.logger.log('_updatePortfolioItemConfig')
         var workspaceRef = this.getContext().getWorkspace()._ref;
-        var targetField = this.targetField;
+        var targetField = this.chartSettings.categoryField;
         this.portfolioItemType = cb.getRecord().get('TypePath');
+        this.portfolioItemDisplayName = cb.getRecord().get(cb.displayField);
+        //Temporary
+        if (cb.getRecord().get('Ordinal') > 0){
+            return;  //Don't process becuase we can't handle this yet
+        }
 
         this.logger.log('_loadCategories', this.portfolioItemType, targetField);
 
@@ -119,6 +110,18 @@ Ext.define("PortfolioAlignment", {
                     callback: function(allowedValues, operation, success){
                         if (success){
                             var values = _.map(allowedValues, function(av){return av.get('StringValue')});
+                            var i = 0;
+                            this.logger.log('AllowedValues ', values);
+                            var legendColors = {};
+                            Ext.each(values, function(v){
+                                if (v && v.length > 0) {
+                                    legendColors[v] = this.chartSettings.chartColors[i++];
+                                }
+                                if (i == this.chartSettings.chartColors.length){
+                                    i = 0;
+                                }
+                            }, this);
+                            this.chartSettings.setLegendColors(legendColors);
                             this.targetFieldValues = values;
                             this._updateApp();
                         } else {
@@ -132,8 +135,9 @@ Ext.define("PortfolioAlignment", {
         });
     },
     _updateChart: function(chartItemId, series, config){
-        var queryId = '#' + chartItemId;
-        var ct = this.down(queryId);
+        var queryId = '#' + chartItemId,
+            ct = this.down(queryId);
+
         if (ct){
             this.down(queryId).removeAll();
         } else {
@@ -143,64 +147,103 @@ Ext.define("PortfolioAlignment", {
                 flex: 1
             });
         }
-        ct.add ({
-                xtype: 'rallychart',
-                loadMask: false,
-                chartData: {
-                    series: series
-                },
-                chartConfig: config
+
+        var chart = ct.add ({
+            xtype: 'rallychart',
+            loadMask: false,
+            chartData: {
+                series: series
+            },
+            chartConfig: config
         });
     },
+    _addLegend: function(){
+
+        this.down('#ct-legend').removeAll();
+
+        var color_data = [];
+        _.each(this.chartSettings.legendColors, function(color, label){
+            color_data.push({color: color, label: label});
+        });
+
+        var ct = this.down('#ct-legend').add({
+            xtype: 'container',
+            padding: 10,
+            height: 40,
+            tpl: '<tpl for="."><div class="tslegend" style="background-color:{color}">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;{label}</div><span class="tslegendspacer">&nbsp;</span></tpl>'
+        });
+        ct.update(color_data);
+    },
     _updateTargetChart: function(){
-        this._updateChart('ct-target',[this._getTargetChartData()],this._getChartConfig('Target'));
+        this._updateChart('ct-target',[this._getTargetChartData()],this._getChartConfig("targeted"));
     },
     _updateApp: function() {
         var piTypeRecord = this.portfolioItemType,
             timebox = null,
-            targetField = this.targetField,
             allowedValues = this._getTargetFieldValues();
 
         if (this.getContext().getTimeboxScope()){
             timebox = this.getContext().getTimeboxScope().getRecord();
         }
 
-        this.logger.log('_updateDisplay PortfolioItem Type, Timebox, categories', piTypeRecord, timebox, allowedValues);
+        this.logger.log('_updateApp PortfolioItem Type, Timebox, categories', piTypeRecord, timebox, allowedValues);
 
-        if (piTypeRecord && timebox && allowedValues) {
+        if (piTypeRecord && allowedValues) {
             this.down('#ct-display').removeAll();  //cleanup
 
-           this._updateTargetChart();
+            this._updateTargetChart();
+
+            this._addLegend();
 
             this._fetchData(piTypeRecord, timebox).then({
                 scope: this,
                 success: function(data){
-                    if (data && data.length > 0){
-                        this._updateChart('ct-planned',
-                            [this._getChartData(data,'PreliminaryEstimate','Planned',"Value")],
-                            this._getChartConfig("Planned"));
+                    this.logger.log('_fetchData', data);
+
+                     if (data && data.length > 0){
+
+                         this._updateChart('ct-planned',
+                            [this._getChartData(data,"planned")],
+                            this._getChartConfig("planned"));
 
                         this._updateChart('ct-scheduled',
-                            [this._getChartData(data,'PreliminaryEstimate','Planned',"Value")],
-                            this._getChartConfig("Planned"));
-
-                        this._updateChart('ct-planned',
-                            [this._getChartData(data,this.plannedField,'Scheduled')],
-                            this._getChartConfig("Scheduled"));
+                            [this._getChartData(data,"scheduled")],
+                            this._getChartConfig("scheduled"));
 
                         this._updateChart('ct-actual',
-                            [this._getChartData(data,this.actualField,'Actual')],
-                            this._getChartConfig("Actual"));
+                            [this._getChartData(data,"actual")],
+                            this._getChartConfig("actual"));
 
-                    } else {
-                        //TODO:  Add text to indicate that no data was found for the current settings
+                     } else {
+                         var releaseName = timebox ? timebox.get('Name') : '(No Release)';
+                        this.down('#ct-display').add({
+                            xtype: 'container',
+                            html: Ext.String.format('No {0} data was found for the currently selected project ({1}) in {2}',piTypeRecord, this.getContext().getProject().Name, releaseName),
+                            style: {
+                                textAlign: 'center',
+                                fontSize: '12px'
+                            },
+                             flex: 1
+                        });
+                        Rally.ui.notify.Notifier.showWarning({message: 'No ' + piTypeRecord + ' data was found for the currently selected project scope (' + this.getContext().getProject().Name + ') and release.'});
                     }
-
                 },
                 failure: function(operation){
-                    Rally.ui.notify.Notifier.showError({message: 'Error fetching portfolio items:  ' + operation.error.errors[0]});
+                    var msg = 'Error fetching portfolio items:  ' + operation.error.errors[0];
+                    Rally.ui.notify.Notifier.showError({message: msg});
+                    this.down('#ct-display').add({
+                        xtype: 'container',
+                        html: msg,
+                        style: {
+                            textAlign: 'center',
+                            fontSize: '12px',
+                            color: 'red'
+                        },
+                        flex: 1
+                    });
                 }
             });
+
         }
         return;
     },
@@ -245,46 +288,49 @@ Ext.define("PortfolioAlignment", {
                 category_data[a] = 0;
             }
         });
-        category_data[this.noneText] = 0;
-        category_data[this.otherText] = 0;
+        category_data[this.chartSettings.noneText] = 0;
+        category_data[this.chartSettings.otherText] = 0;
         return category_data;
     },
-    _getChartData: function(data, dataField, seriesName, optionalDataFieldAttribute,showInLegend){
+    _getChartData: function(data, chartType){
         var category_data = this._initCategoryDataHash(),
             allowedValues = this._getTargetFieldValues(),
-            targetField = this.targetField,
-            noneText = this.noneText,
-            otherText = this.otherText;
+            targetField = this.chartSettings.categoryField,
+            noneText = this.chartSettings.noneText,
+            otherText = this.chartSettings.otherText,
+            dataField = this.chartSettings.getChartTypeDataField(chartType),
+            dataFieldAttribute = this.chartSettings.getChartTypeDataFieldAttribute(chartType);
 
-        showInLegend = showInLegend || false;
 
+        this.logger.log('_getChartData',dataField,dataFieldAttribute);
         Ext.each(data, function(rec){
-
-
             var categoryVal = rec.get(targetField) || noneText,
                 dataVal = rec.get(dataField) || 0;
 
-            if (dataVal && optionalDataFieldAttribute){
-                dataVal = dataVal[optionalDataFieldAttribute] || 0;
+            if (dataVal && dataFieldAttribute){
+                dataVal = dataVal[dataFieldAttribute] || 0;
             }
 
-            if (_.has(category_data, categoryVal)){
-                category_data[categoryVal] += dataVal;
-            } else {
-                category_data[otherText] += dataVal;
+            if (dataVal > 0){
+                if (_.has(category_data, categoryVal)){
+                    category_data[categoryVal] += dataVal;
+                } else {
+                    category_data[otherText] += dataVal;
+                }
             }
         });
+
 
         var series_data = _.map(category_data, function(value, category){
-            return {name: category, y: value};  //, color: this._getColor(colorIndexes[category])});
-        });
+                return {name: category, y: value, color: this.chartSettings.getLegendColor(category)};
+        },this);
 
-        this.logger.log('_getChartData', seriesName, category_data, series_data);
+        this.logger.log('_getChartData', this.chartSettings.getSeriesName(chartType), category_data, series_data);
         return {
                 type: 'pie',
-                name: seriesName,
+                name: this.chartSettings.getSeriesName(chartType),
                 data:  series_data,
-                showInLegend: showInLegend
+                showInLegend: false
         };
 
     },
@@ -297,13 +343,9 @@ Ext.define("PortfolioAlignment", {
                         projectScopeDown: this.getContext().getProjectScopeDown()
             };
 
-        fetch.push(this.targetField);
-        this.logger.log('_fetchData',fetch, context);
-        var store = Ext.create('Rally.data.wsapi.Store',{
-            model: portfolioItemType,
-            fetch: fetch,
-            context: context,
-            filters: [{
+        var filters = [{property: "Release", value: null}];
+        if (release){
+            filters = [{
                 property: 'Release.Name',
                 value: release.get('Name')
             },{
@@ -312,7 +354,16 @@ Ext.define("PortfolioAlignment", {
             },{
                 property: 'Release.ReleaseDate',
                 value: release.get('ReleaseDate')
-            }]
+            }];
+        }
+
+        fetch.push(this.chartSettings.categoryField);
+        this.logger.log('_fetchData',fetch, context);
+        var store = Ext.create('Rally.data.wsapi.Store',{
+            model: portfolioItemType,
+            fetch: fetch,
+            context: context,
+            filters: filters
         });
         store.load({
             callback: function(records, operation, success){
@@ -334,61 +385,82 @@ Ext.define("PortfolioAlignment", {
         Ext.each(categories, function(c){
             if (c && c.length > 0){
                 var val = this._getTargetAllocation(c);
-                series_data.push({name: c, y: val}); //, color: this._getColor(colorIndexes[key])});
+                series_data.push({name: c, y: val, color: this.chartSettings.getLegendColor(c)});
             };
         }, this);
 
         return {
                 type: 'pie',
-                name: 'Target',
+                name: this.chartSettings.getChartTitle("targeted"),
                 data: series_data
             };
     },
-    _getChartConfig: function(title){
+    _getChartConfig: function(chartType){
+        var fnBuildTargetDialog = this._buildTargetDialog,
+            title = this.chartSettings.getChartTitle(chartType),
+            toolTip = this.chartSettings.getToolTip(chartType, this.portfolioItemDisplayName),
+            noDataMessage = this.chartSettings.getNoDataMessage(chartType),
+            style = this.chartSettings.chartType[chartType].titleStyle || {};
+
         return {
             chart: {
                 plotBackgroundColor: null,
                 plotBorderWidth: null,
                 plotShadow: false,
                 events: {
-                    click: function(e){
-                        console.log('chartClicked', e);
+                    load: function(){
+                        var chart = this;
+                        chart.title.on('mouseover', function(e){
+                            Ext.create('Rally.ui.tooltip.ToolTip', {
+                                target : e.target,
+                                html: toolTip,
+                                autoShow: true
+                            });
+                        });
+
+                        if (chartType == "targeted"){
+                            chart.title.on('click', fnBuildTargetDialog);
+                        }
+
+                        var sum_vals = 0;
+                        if (chart.series && chart.series[0] && chart.series[0].data){
+                            sum_vals = Ext.Array.sum(_.map(chart.series[0].data, function(obj){return obj.y;}));
+                        }
+
+                        if (sum_vals <= 0){
+                            var x = chart.plotWidth * .33;
+                            var noDataText = chart.renderer.text(noDataMessage,0,75).add();
+                        }
+
+
                     }
                 }
             },
             title: {
-                text: title
+                text: title,
+                style: style
             },
             tooltip: {
                 pointFormat: '{point.y:.1f} (<b>{point.percentage:.1f}%</b>)'
             },
             plotOptions: {
                 pie: {
-                    allowPointSelect: true,
-                        cursor: 'pointer',
+                     allowPointSelect: true,
                         dataLabels: {
-                        enabled: false
-                    },
-                    showInLegend: true
-                },
-                series: {
-                    point: {
-                        events: {
-                            legendItemClick: function () {
-                                return false; // <== returning false will cancel the default action
-                            }
-                        }
-                    }
-                }
-            },
-            legend: {
-                symbolHeight: 8,
-                symbolWidth: 8,
-                padding: 4,
-                borderColor: null,
-                itemStyle: {"fontSize": "9px"}
-            }
+                            enabled: this.chartSettings.showDataLabels,
+                            distance: this.chartSettings.dataLabelDistance,
+                            color: this.chartSettings.dataLabelColor,
+                            formatter: function(){
 
+                                if (this.percentage > 0){
+                                    return this.percentage.toFixed(1) + '%';
+                                }
+                                return null;
+                            }
+                    },
+                    showInLegend: false
+                }
+            }
         };
     },
     _getTargetFieldValues: function(){
@@ -398,17 +470,19 @@ Ext.define("PortfolioAlignment", {
         return null;
     },
     _buildTargetDialog: function(){
+        var thisApp = Rally.getApp();
+        thisApp.logger.log('_buildTargetDialog', thisApp);
+
         Ext.create('Rally.technicalservices.dialog.TargetAllocation', {
-            targetAllocation: this._getTargetAllocationHash(),
+            targetAllocation: thisApp._getTargetAllocationHash(),
             listeners: {
-                scope: this,
-                allocationsupdate: this._updateTargetAllocations
+                scope: thisApp,
+                allocationsupdate: function(updatedHash){
+                    this.logger.log('allocations updated', updatedHash);
+                    this._setTargetAllocationHash(updatedHash);
+                    this._updateTargetChart();
+                }
             }
          });
-    },
-    _updateTargetAllocations: function(updatedHash){
-        this.logger.log('_updateTargetAllocations', updatedHash);
-        this._setTargetAllocationHash(updatedHash);
-        this._updateTargetChart();
     }
 });
