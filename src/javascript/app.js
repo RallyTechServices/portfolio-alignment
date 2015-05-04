@@ -47,7 +47,7 @@ Ext.define("PortfolioAlignment", {
             this.add({xtype: 'container',itemId:'ct-header', cls: 'header', layout: {type: 'hbox'}});
             this.add({xtype: 'container',itemId:'ct-display', layout:{type: 'hbox'}});
             this.add({xtype: 'container',itemId:'ct-legend', flex: 1, layout:{type: 'hbox', pack: 'center'}});
-            this.add({xtype: 'tsinfolink', data: {date: Rally.util.DateTime.formatWithDefaultDateTime(new Date())}});
+            this.add({xtype: 'tsinfolink', renderData: {date: Rally.util.DateTime.formatWithDefaultDateTime(new Date())}});
         }
         this.cbPortfolioItemType = this.getHeader().add({
             xtype: 'rallyportfolioitemtypecombobox',
