@@ -3,7 +3,7 @@ Ext.define('Rally.technicalservices.dialog.TargetAllocation', {
     autoShow: true,
     draggable: true,
     modal: true,
-    width: 300,
+    width: 350,
     title: 'Target Allocations',
     items: {
         xtype: 'container',
@@ -47,6 +47,7 @@ Ext.define('Rally.technicalservices.dialog.TargetAllocation', {
                 xtype: 'rallynumberfield',
                 fieldLabel: key,
                 labelAlign: 'right',
+                labelWidth: 150,
                 value: val || 0,
                 minValue: 0,
                 maxValue: 100,

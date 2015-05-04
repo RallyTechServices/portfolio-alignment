@@ -12,6 +12,7 @@ Ext.define("PortfolioAlignment", {
         },
         {
             xtype: 'tsinfolink',
+            height: 20,
             renderData: {date: Rally.util.DateTime.formatWithDefaultDateTime(new Date())}
         }],
     /**
@@ -51,7 +52,7 @@ Ext.define("PortfolioAlignment", {
         this.cbPortfolioItemType = this.getHeader().add({
             xtype: 'rallyportfolioitemtypecombobox',
             itemId: 'type-combo',
-            fieldLabel: 'PortfolioItem Type',
+            fieldLabel: 'Portfolio Item Type',
             labelWidth: 100,
             labelAlign: 'right',
             margin: 10,
@@ -70,6 +71,14 @@ Ext.define("PortfolioAlignment", {
                 },
                 change: this._updatePortfolioItemConfig
             }
+        });
+
+        this.getHeader().add({
+            xtype: 'rallybutton',
+            text: 'Configure Targets...',
+            scope: this,
+            handler: this._buildTargetDialog,
+            margin: 10
         });
 
     },
@@ -123,7 +132,12 @@ Ext.define("PortfolioAlignment", {
                             }, this);
                             this.chartSettings.setLegendColors(legendColors);
                             this.targetFieldValues = values;
-                            this._updateApp();
+                            this._loadTargetAllocationHash(this.portfolioItemType, values).then({
+                                scope: this,
+                                success: function(){
+                                    this._updateApp();
+                                }
+                            });
                         } else {
                             var msg = 'Error retrieving allowed values for ' + targetField + ': ' + operation.error.errors[0];
                             Rally.ui.notify.Notifier.showError({message: msg});
@@ -144,7 +158,8 @@ Ext.define("PortfolioAlignment", {
             ct = this.down('#ct-display').add({
                 xtype: 'container',
                 itemId: chartItemId,
-                flex: 1
+                flex: 1,
+                maxHeight: 325
             });
         }
 
@@ -156,6 +171,8 @@ Ext.define("PortfolioAlignment", {
             },
             chartConfig: config
         });
+
+        ct.setHeight(300);
     },
     _addLegend: function(){
 
@@ -168,11 +185,11 @@ Ext.define("PortfolioAlignment", {
 
         var ct = this.down('#ct-legend').add({
             xtype: 'container',
-            padding: 10,
-            height: 40,
+            //height: 40,
             tpl: '<tpl for="."><div class="tslegend" style="background-color:{color}">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;{label}</div><span class="tslegendspacer">&nbsp;</span></tpl>'
         });
         ct.update(color_data);
+
     },
     _updateTargetChart: function(){
         this._updateChart('ct-target',[this._getTargetChartData()],this._getChartConfig("targeted"));
@@ -247,35 +264,84 @@ Ext.define("PortfolioAlignment", {
         }
         return;
     },
-    _getTargetAllocationHash: function(){
-        var targetAllocationHash = this.targetAllocationHash || {};
-        this.logger.log('_getTargetAllocationHash', targetAllocationHash);
+    _buildDefaultTargetAllocationHash: function(targetValuesArray){
+        var targetAllocationHash = {},
+            numValidTargetValues = _.without(targetValuesArray,"").length,
+            defaultTargetAllocation = numValidTargetValues > 0 ? 100 / numValidTargetValues : 100;
 
-        if (_.isEmpty(targetAllocationHash)){
-            //TODO: load from preferences .
-            var targetFieldValues = this._getTargetFieldValues();
-
-            var numValidTargetValues = _.without(targetFieldValues,"").length;
-            var defaultTargetAllocation = numValidTargetValues > 0 ? 100 / numValidTargetValues : 100;
-            Ext.each(targetFieldValues, function(f){
-                if (f && f.length > 0){
-                    targetAllocationHash[f] = defaultTargetAllocation;
-                }
-            });
-            this.logger.log('_getTargetAllocationHash updated', targetAllocationHash);
-            this._setTargetAllocationHash(targetAllocationHash);
-        }
+        Ext.each(targetValuesArray, function(f){
+            if (f && f.length > 0){
+                targetAllocationHash[f] = defaultTargetAllocation;
+            }
+        });
         return targetAllocationHash;
+    },
+    _cleanTargetAllocationHash: function(hash, values){
+        var cleansedHash = {},
+            noneText = this.chartSettings.noneText;
+
+        _.each(values, function(v){
+            if (v && v.length > 0) {
+                cleansedHash[v] = 0;
+            }
+        });
+        cleansedHash[noneText] = 0;
+
+        _.each(hash, function(value, key){
+            if (Ext.Array.contains(values, key)){
+                cleansedHash[key] = value;
+            } else {
+                cleansedHash[noneText] = (cleansedHash[noneText] || 0) + value;
+            }
+        });
+        return cleansedHash;
+    },
+    _loadTargetAllocationHash: function(portfolioItemType, targetFieldValues){
+        var deferred = Ext.create('Deft.Deferred');
+
+        var targetAllocationHash = {};
+        this.logger.log('_loadTargetAllocationHash', targetAllocationHash);
+
+        Rally.data.PreferenceManager.load({
+            appID: this.getAppId(),
+            filterByName: this.portfolioItemType,
+            scope: this,
+            success: function(prefs) {
+                this.logger.log('TargetAllocationHash preferences loaded', prefs);
+                if (prefs[this.portfolioItemType]){
+                    targetAllocationHash = Ext.JSON.decode(prefs[this.portfolioItemType]);
+                    targetAllocationHash = this._cleanTargetAllocationHash(targetAllocationHash, targetFieldValues);
+                } else {
+                    targetAllocationHash = this._buildDefaultTargetAllocationHash(targetFieldValues);
+                }
+                this.logger.log('_getTargetAllocationHash updated', targetAllocationHash);
+                this._setTargetAllocationHash(targetAllocationHash);
+
+                deferred.resolve();
+            }
+        });
+
+        return deferred;
     },
     _setTargetAllocationHash: function(hash){
         this.targetAllocationHash = hash;
-        //TODO: save to preferences
+
+        var prefs = {};
+        prefs[this.portfolioItemType] = Ext.JSON.encode(hash);
+
+        Rally.data.PreferenceManager.update({
+            appID: this.getAppId(),
+            settings: prefs,
+            scope: this,
+            success: function(updatedRecords, notUpdatedRecords) {
+                this.logger.log('_setTargetAllocationHash save preferences',updatedRecords, notUpdatedRecords);
+            }
+        });
     },
     _getTargetAllocation: function(targetValue){
-
-        this.logger.log('_getTargetAllocation',targetValue, this._getTargetAllocationHash());
+        this.logger.log('_getTargetAllocation',targetValue);
         if (targetValue && targetValue.length > 0){
-            return this._getTargetAllocationHash()[targetValue];
+            return this.targetAllocationHash[targetValue] || 0;
         }
         return 0;
     },
@@ -289,7 +355,7 @@ Ext.define("PortfolioAlignment", {
             }
         });
         category_data[this.chartSettings.noneText] = 0;
-        category_data[this.chartSettings.otherText] = 0;
+       // category_data[this.chartSettings.otherText] = 0;
         return category_data;
     },
     _getChartData: function(data, chartType){
@@ -297,7 +363,7 @@ Ext.define("PortfolioAlignment", {
             allowedValues = this._getTargetFieldValues(),
             targetField = this.chartSettings.categoryField,
             noneText = this.chartSettings.noneText,
-            otherText = this.chartSettings.otherText,
+            //otherText = this.chartSettings.otherText,
             dataField = this.chartSettings.getChartTypeDataField(chartType),
             dataFieldAttribute = this.chartSettings.getChartTypeDataFieldAttribute(chartType);
 
@@ -315,14 +381,16 @@ Ext.define("PortfolioAlignment", {
                 if (_.has(category_data, categoryVal)){
                     category_data[categoryVal] += dataVal;
                 } else {
-                    category_data[otherText] += dataVal;
+                    //category_data[otherText] += dataVal;
+                    this.logger.log('Category not valid', categoryVal, dataVal);
                 }
             }
-        });
+        }, this);
 
 
         var series_data = _.map(category_data, function(value, category){
-                return {name: category, y: value, color: this.chartSettings.getLegendColor(category)};
+
+                return {name: category, y: value, color: this.chartSettings.getLegendColor(category), visible: (value > 0)};
         },this);
 
         this.logger.log('_getChartData', this.chartSettings.getSeriesName(chartType), category_data, series_data);
@@ -381,7 +449,7 @@ Ext.define("PortfolioAlignment", {
     _getTargetChartData: function(){
         var categories = this._getTargetFieldValues();
         var series_data = [];
-
+        categories.push(this.chartSettings.noneText);
         Ext.each(categories, function(c){
             if (c && c.length > 0){
                 var val = this._getTargetAllocation(c);
@@ -396,17 +464,18 @@ Ext.define("PortfolioAlignment", {
             };
     },
     _getChartConfig: function(chartType){
-        var fnBuildTargetDialog = this._buildTargetDialog,
-            title = this.chartSettings.getChartTitle(chartType),
-            toolTip = this.chartSettings.getToolTip(chartType, this.portfolioItemDisplayName),
-            noDataMessage = this.chartSettings.getNoDataMessage(chartType),
-            style = this.chartSettings.chartType[chartType].titleStyle || {};
+            var title = this.chartSettings.getChartTitle(chartType),
+                toolTip = this.chartSettings.getToolTip(chartType, this.portfolioItemDisplayName),
+                noDataMessage = this.chartSettings.getNoDataMessage(chartType);
 
         return {
             chart: {
                 plotBackgroundColor: null,
                 plotBorderWidth: null,
                 plotShadow: false,
+                marginBottom: 0,
+                marginTop: 0,
+                spacingBottom: 0,
                 events: {
                     load: function(){
                         var chart = this;
@@ -418,40 +487,37 @@ Ext.define("PortfolioAlignment", {
                             });
                         });
 
-                        if (chartType == "targeted"){
-                            chart.title.on('click', fnBuildTargetDialog);
-                        }
-
                         var sum_vals = 0;
                         if (chart.series && chart.series[0] && chart.series[0].data){
                             sum_vals = Ext.Array.sum(_.map(chart.series[0].data, function(obj){return obj.y;}));
                         }
 
                         if (sum_vals <= 0){
-                            var x = chart.plotWidth * .33;
-                            var noDataText = chart.renderer.text(noDataMessage,0,75).add();
+                            var x = chart.plotWidth * .33,
+                                y = chart.plotHeight * .40;
+                            var noDataText = chart.renderer.text(noDataMessage,x,y).add();
                         }
-
-
                     }
                 }
             },
             title: {
-                text: title,
-                style: style
+                text: title
             },
             tooltip: {
                 pointFormat: '{point.y:.1f} (<b>{point.percentage:.1f}%</b>)'
             },
             plotOptions: {
                 pie: {
-                     allowPointSelect: true,
+                    size: '75%',
+                    center: ['50%','40%'],
+                    allowPointSelect: true,
                         dataLabels: {
                             enabled: this.chartSettings.showDataLabels,
                             distance: this.chartSettings.dataLabelDistance,
                             color: this.chartSettings.dataLabelColor,
+                            crop: false,
+                            overflow: 'none',
                             formatter: function(){
-
                                 if (this.percentage > 0){
                                     return this.percentage.toFixed(1) + '%';
                                 }
@@ -470,13 +536,12 @@ Ext.define("PortfolioAlignment", {
         return null;
     },
     _buildTargetDialog: function(){
-        var thisApp = Rally.getApp();
-        thisApp.logger.log('_buildTargetDialog', thisApp);
+        this.logger.log('_buildTargetDialog', this.targetAllocationHash);
 
         Ext.create('Rally.technicalservices.dialog.TargetAllocation', {
-            targetAllocation: thisApp._getTargetAllocationHash(),
+            targetAllocation: this.targetAllocationHash,
             listeners: {
-                scope: thisApp,
+                scope: this,
                 allocationsupdate: function(updatedHash){
                     this.logger.log('allocations updated', updatedHash);
                     this._setTargetAllocationHash(updatedHash);
