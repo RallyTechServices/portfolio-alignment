@@ -3,11 +3,11 @@
 <head>
     <title>Portfolio Alignment</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Mon May 04 2015 18:14:04 GMT-0600 (MDT) -->
+    <!--  Build Date: Mon May 04 2015 20:52:02 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon May 04 2015 18:14:04 GMT-0600 (MDT)";
-        var CHECKSUM = 24924984724;
+        var APP_BUILD_DATE = "Mon May 04 2015 20:52:02 GMT-0600 (MDT)";
+        var CHECKSUM = 25013212243;
     </script>
     
     <script type="text/javascript" src="/apps/2.0/sdk.js"></script>
@@ -455,6 +455,10 @@ Ext.define("PortfolioAlignment", {
                 sorters: [{
                     property: 'Ordinal',
                     direction: 'ASC'
+                }],
+                filters: [{
+                    property: 'Ordinal',
+                    value: 0
                 }]
             },
             listeners: {
@@ -462,7 +466,7 @@ Ext.define("PortfolioAlignment", {
                 ready: function(cb) {
                     var rec = cb.getStore().getAt(0);
                     cb.setValue(rec.get(cb.valueField));
-                    cb.setDisabled(true);  //Temporary until we figure out how to handle parent portfolio item type
+                    //cb.setDisabled(true);  //Temporary until we figure out how to handle parent portfolio item type
                 },
                 change: this._updatePortfolioItemConfig
             }

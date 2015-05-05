@@ -60,6 +60,10 @@ Ext.define("PortfolioAlignment", {
                 sorters: [{
                     property: 'Ordinal',
                     direction: 'ASC'
+                }],
+                filters: [{
+                    property: 'Ordinal',
+                    value: 0
                 }]
             },
             listeners: {
@@ -67,7 +71,7 @@ Ext.define("PortfolioAlignment", {
                 ready: function(cb) {
                     var rec = cb.getStore().getAt(0);
                     cb.setValue(rec.get(cb.valueField));
-                    cb.setDisabled(true);  //Temporary until we figure out how to handle parent portfolio item type
+                    //cb.setDisabled(true);  //Temporary until we figure out how to handle parent portfolio item type
                 },
                 change: this._updatePortfolioItemConfig
             }
