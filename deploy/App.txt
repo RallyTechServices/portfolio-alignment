@@ -3,11 +3,11 @@
 <head>
     <title>Portfolio Alignment</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Mon May 04 2015 18:00:52 GMT-0600 (MDT) -->
+    <!--  Build Date: Mon May 04 2015 18:14:04 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon May 04 2015 18:00:52 GMT-0600 (MDT)";
-        var CHECKSUM = 24782931681;
+        var APP_BUILD_DATE = "Mon May 04 2015 18:14:04 GMT-0600 (MDT)";
+        var CHECKSUM = 24924984724;
     </script>
     
     <script type="text/javascript" src="/apps/2.0/sdk.js"></script>
@@ -603,9 +603,6 @@ Ext.define("PortfolioAlignment", {
         if (piTypeRecord && allowedValues) {
             this.down('#ct-display').removeAll();  //cleanup
 
-            this._updateTargetChart();
-
-            this._addLegend();
 
             this._fetchData(piTypeRecord, timebox).then({
                 scope: this,
@@ -613,6 +610,9 @@ Ext.define("PortfolioAlignment", {
                     this.logger.log('_fetchData', data);
 
                      if (data && data.length > 0){
+                         this._updateTargetChart();
+
+                         this._addLegend();
 
                          this._updateChart('ct-planned',
                             [this._getChartData(data,"planned")],
@@ -844,7 +844,10 @@ Ext.define("PortfolioAlignment", {
     _getTargetChartData: function(){
         var categories = this._getTargetFieldValues();
         var series_data = [];
-        categories.push(this.chartSettings.noneText);
+        if (!Ext.Array.contains(categories, this.chartSettings.noneText)){
+            categories.push(this.chartSettings.noneText);
+        }
+
         Ext.each(categories, function(c){
             if (c && c.length > 0){
                 var val = this._getTargetAllocation(c);

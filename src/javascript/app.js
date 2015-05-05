@@ -208,9 +208,6 @@ Ext.define("PortfolioAlignment", {
         if (piTypeRecord && allowedValues) {
             this.down('#ct-display').removeAll();  //cleanup
 
-            this._updateTargetChart();
-
-            this._addLegend();
 
             this._fetchData(piTypeRecord, timebox).then({
                 scope: this,
@@ -218,6 +215,9 @@ Ext.define("PortfolioAlignment", {
                     this.logger.log('_fetchData', data);
 
                      if (data && data.length > 0){
+                         this._updateTargetChart();
+
+                         this._addLegend();
 
                          this._updateChart('ct-planned',
                             [this._getChartData(data,"planned")],
@@ -449,7 +449,10 @@ Ext.define("PortfolioAlignment", {
     _getTargetChartData: function(){
         var categories = this._getTargetFieldValues();
         var series_data = [];
-        categories.push(this.chartSettings.noneText);
+        if (!Ext.Array.contains(categories, this.chartSettings.noneText)){
+            categories.push(this.chartSettings.noneText);
+        }
+
         Ext.each(categories, function(c){
             if (c && c.length > 0){
                 var val = this._getTargetAllocation(c);
