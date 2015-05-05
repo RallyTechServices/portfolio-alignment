@@ -1,7 +1,7 @@
 #Portfolio Alignment
 Shows pie charts for Investment Allocations of the lowest level Portfolio Items within the scope of the selected Release and current project scope settings.
 
-This app using the Rally 2.0 SDK and the WSAPI API.  This app does NOT use the Lookback API.
+This app using the Rally 2.0 SDK and the WSAPI API.  This app does NOT use the Lookback API. This app can be used on a Release filtered dashboard.
 
 The data set for the charts include all lowest level Portfolio Items in the current project scope that are explicitly associated
 with the selected release (or no release if "Unscheduled" is selected).
