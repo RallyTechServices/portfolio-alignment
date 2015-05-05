@@ -3,11 +3,11 @@
 <head>
     <title>Portfolio Alignment</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Mon May 04 2015 20:52:02 GMT-0600 (MDT) -->
+    <!--  Build Date: Mon May 04 2015 20:55:17 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon May 04 2015 20:52:02 GMT-0600 (MDT)";
-        var CHECKSUM = 25013212243;
+        var APP_BUILD_DATE = "Mon May 04 2015 20:55:17 GMT-0600 (MDT)";
+        var CHECKSUM = 22312009244;
     </script>
     
     <script type="text/javascript" src="/apps/2.0/sdk.js"></script>
@@ -138,59 +138,6 @@ Ext.define('Rally.technicalservices.Logger',{
 
 });
 
-Ext.define('Rally.technicalservices.chart.AllocationPie',{
-    extend: 'Rally.ui.chart.Chart',
-    chart: {
-        plotBackgroundColor: null,
-        plotBorderWidth: null,
-        plotShadow: false,
-        events: {
-            load: function(){
-                var chart = this,
-                    title = chart.title.text;
-
-                chart.title.on('mouseover', function(e){
-
-                    Ext.create('Rally.technicalservices.tooltip.Help', {
-                        target : e.target,
-                        type: title,
-                        autoShow: true
-                    });
-                });
-
-                if (title == targetTitle){
-                    chart.title.on('click', fnBuildTargetDialog);
-                }
-            }
-        }
-    },
-    title: {
-       // text: title,
-       // style: style
-    },
-    tooltip: {
-        pointFormat: '{point.y:.1f} (<b>{point.percentage:.1f}%</b>)'
-    },
-    plotOptions: {
-        pie: {
-            allowPointSelect: true,
-            cursor: 'pointer',
-            dataLabels: {
-                enabled: this.showDataLabels,
-                distance: 3,
-                color: 'black',
-                formatter: function(){
-
-                    if (this.percentage > 0){
-                        return this.percentage.toFixed(1) + '%';
-                    }
-                    return null;
-                }
-            },
-            showInLegend: false
-        }
-    }
-});
 Ext.define('Rally.technicalservices.PortfolioAlignmentSettings',{
 
     chartColors: [ '#2f7ed8', '#8bbc21', '#910000',
@@ -282,23 +229,6 @@ Ext.define('Rally.technicalservices.PortfolioAlignmentSettings',{
         return '<span class="tscenter">No data to display</span>';
     }
 });
-Ext.define('Rally.technicalservices.Legend',{
-    extend: 'Ext.Container',
-    alias: 'widget.tslegend',
-    padding: 10,
-    height: 40,
-    flex: 1,
-    layout: {type: 'hbox', pack: 'center'} ,
-    tpl: '<tpl for="."><div class="tslegend" style="background-color:{color}">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;{label}</div><span class="tslegendspacer">&nbsp;</span></tpl>',
-    setLegendColors: function(legendHash){
-        var color_data = [];
-        _.each(legendHash, function(color, label){
-            color_data.push({color: color, label: label});
-        });
-        this.update(color_data);
-    }
-});
-
 Ext.define('Rally.technicalservices.dialog.TargetAllocation', {
     extend: 'Rally.ui.dialog.Dialog',
     autoShow: true,
