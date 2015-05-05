@@ -1,8 +1,7 @@
 #Portfolio Alignment
-Shows pie charts for the Targeted, Planned, Scheduled and Actual Investment Category allocations for the lowest level portfolio items
-within the scope of the selected Release and current project scope settings.
+Shows pie charts for Investment Allocations of the lowest level Portfolio Items within the scope of the selected Release and current project scope settings.
 
-This app using the Rally 2.0 SDK and the WSAPI API.  The app does NOT use the Lookback API.
+This app using the Rally 2.0 SDK and the WSAPI API.  This app does NOT use the Lookback API.
 
 The data set for the charts include all lowest level Portfolio Items in the current project scope that are explicitly associated
 with the selected release (or no release if "Unscheduled" is selected).
@@ -10,8 +9,8 @@ with the selected release (or no release if "Unscheduled" is selected).
 ![ScreenShot](/images/portfolio-alignment.png)
 
 
-####Target pie chart
-The "Target" pie chart displays the desired distribution of investment categories which is
+####Investment Planning Targets Pie Chart
+Displays the desired distribution of investment categories which is
 configurable through a dialog by clicking the "Configure Targets..." button.  Allocations must add up to 100%.
 
 Allocation distributions for the desired Target pie are saved on a per App basis. If no target allocations were previously
@@ -21,7 +20,7 @@ If an Investment Category name is changed from what has been saved, the allocati
 changed will be put into a "None" category until it can be properly reassigned by clicking on the "Configure Targets..." button.
 
 #### Preliminary Feature Estimates Pie Chart
-The "Planned"  pie chart shows the allocation of the Preliminary Estimate values for the lowest level Portfolio Item types for
+Displays the allocation of the Preliminary Estimate values for the lowest level Portfolio Item types for
 each Investment category.  If a portfolio item does not have a Preliminary Estimate assigned, then its data is not included in the chart.
 
 #### Estimated User Story Points Pie Chart
