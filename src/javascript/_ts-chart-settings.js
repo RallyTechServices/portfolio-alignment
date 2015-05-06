@@ -44,7 +44,7 @@ Ext.define('Rally.technicalservices.PortfolioAlignmentSettings',{
     legendColors: {},
 
     showDataLabels: true,
-    dataLabelDistance: -5,
+    dataLabelDistance: 1,
     dataLabelColor: 'black',
 
     setLegendColors: function(legendColorHash){

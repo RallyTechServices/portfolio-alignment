@@ -3,11 +3,11 @@
 <head>
     <title>Portfolio Alignment</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Mon May 04 2015 20:55:17 GMT-0600 (MDT) -->
+    <!--  Build Date: Wed May 06 2015 12:52:50 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon May 04 2015 20:55:17 GMT-0600 (MDT)";
-        var CHECKSUM = 22312009244;
+        var APP_BUILD_DATE = "Wed May 06 2015 12:52:50 GMT-0600 (MDT)";
+        var CHECKSUM = 22448582240;
     </script>
     
     <script type="text/javascript" src="/apps/2.0/sdk.js"></script>
@@ -184,7 +184,7 @@ Ext.define('Rally.technicalservices.PortfolioAlignmentSettings',{
     legendColors: {},
 
     showDataLabels: true,
-    dataLabelDistance: -5,
+    dataLabelDistance: 1,
     dataLabelColor: 'black',
 
     setLegendColors: function(legendColorHash){
@@ -399,7 +399,8 @@ Ext.define("PortfolioAlignment", {
                     //cb.setDisabled(true);  //Temporary until we figure out how to handle parent portfolio item type
                 },
                 change: this._updatePortfolioItemConfig
-            }
+            },
+            hidden: true //until we decide to deal with the upper level portfolio items.
         });
 
         this.getHeader().add({
