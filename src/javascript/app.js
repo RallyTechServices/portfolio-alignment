@@ -74,7 +74,8 @@ Ext.define("PortfolioAlignment", {
                     //cb.setDisabled(true);  //Temporary until we figure out how to handle parent portfolio item type
                 },
                 change: this._updatePortfolioItemConfig
-            }
+            },
+            hidden: true //until we decide to deal with the upper level portfolio items.
         });
 
         this.getHeader().add({
