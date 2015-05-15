@@ -13,11 +13,18 @@ with the selected release (or no release if "Unscheduled" is selected).
 Displays the desired distribution of investment categories which is
 configurable through a dialog by clicking the "Configure Targets..." button.  Allocations must add up to 100%.
 
-Allocation distributions for the desired Target pie are saved on a per App basis. If no target allocations were previously
+Allocation distributions for the desired Target pie are saved on a per Release and per App basis. If no target allocations were previously
 defined, then the allocations will by default be evenly distributed amongst all categories.
+
+The distributions will be saved for each release where the Name, Start Date and End Date are the same.  If a release has the same name as other release, but different
+start and end dates, targets will be saved separately for those.
+
+Note that because the target allocation settings are saved for the workspace, the users must be a workspace admin for those targets to be persisted when
+the app is reloaded.  Target changes for a release by any user will persist for the session.
 
 If an Investment Category name is changed from what has been saved, the allocation whose investment category name has been
 changed will be put into a "None" category until it can be properly reassigned by clicking on the "Configure Targets..." button.
+
 
 #### Preliminary Feature Estimates Pie Chart
 Displays the allocation of the Preliminary Estimate values for the lowest level Portfolio Item types for
