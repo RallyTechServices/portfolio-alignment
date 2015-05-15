@@ -137,7 +137,10 @@ Ext.define("PortfolioAlignment", {
                             }, this);
                             this.chartSettings.setLegendColors(legendColors);
                             this.targetFieldValues = values;
-                            this._loadTargetAllocationHash(this.portfolioItemType, values).then({
+                            this.allocationPreferences = Ext.create('Rally.technicalservices.preferences.Allocation',{
+                                noneText: this.noneText
+                            });
+                            this.allocationPreferences.load(this.getAppId(),this.portfolioItemType,values).then({
                                 scope: this,
                                 success: function(){
                                     this._updateApp();
@@ -164,7 +167,7 @@ Ext.define("PortfolioAlignment", {
                 xtype: 'container',
                 itemId: chartItemId,
                 flex: 1,
-                maxHeight: 325
+                maxHeight: 350
             });
         }
 
@@ -269,88 +272,7 @@ Ext.define("PortfolioAlignment", {
         }
         return;
     },
-    _buildDefaultTargetAllocationHash: function(targetValuesArray){
-        var targetAllocationHash = {},
-            numValidTargetValues = _.without(targetValuesArray,"").length,
-            defaultTargetAllocation = numValidTargetValues > 0 ? 100 / numValidTargetValues : 100;
-
-        Ext.each(targetValuesArray, function(f){
-            if (f && f.length > 0){
-                targetAllocationHash[f] = defaultTargetAllocation;
-            }
-        });
-        return targetAllocationHash;
-    },
-    _cleanTargetAllocationHash: function(hash, values){
-        var cleansedHash = {},
-            noneText = this.chartSettings.noneText;
-
-        _.each(values, function(v){
-            if (v && v.length > 0) {
-                cleansedHash[v] = 0;
-            }
-        });
-        cleansedHash[noneText] = 0;
-
-        _.each(hash, function(value, key){
-            if (Ext.Array.contains(values, key)){
-                cleansedHash[key] = value;
-            } else {
-                cleansedHash[noneText] = (cleansedHash[noneText] || 0) + value;
-            }
-        });
-        return cleansedHash;
-    },
-    _loadTargetAllocationHash: function(portfolioItemType, targetFieldValues){
-        var deferred = Ext.create('Deft.Deferred');
-
-        var targetAllocationHash = {};
-        this.logger.log('_loadTargetAllocationHash', targetAllocationHash);
-
-        Rally.data.PreferenceManager.load({
-            appID: this.getAppId(),
-            filterByName: this.portfolioItemType,
-            scope: this,
-            success: function(prefs) {
-                this.logger.log('TargetAllocationHash preferences loaded', prefs);
-                if (prefs[this.portfolioItemType]){
-                    targetAllocationHash = Ext.JSON.decode(prefs[this.portfolioItemType]);
-                    targetAllocationHash = this._cleanTargetAllocationHash(targetAllocationHash, targetFieldValues);
-                } else {
-                    targetAllocationHash = this._buildDefaultTargetAllocationHash(targetFieldValues);
-                }
-                this.logger.log('_getTargetAllocationHash updated', targetAllocationHash);
-                this._setTargetAllocationHash(targetAllocationHash);
-
-                deferred.resolve();
-            }
-        });
-
-        return deferred;
-    },
-    _setTargetAllocationHash: function(hash){
-        this.targetAllocationHash = hash;
-
-        var prefs = {};
-        prefs[this.portfolioItemType] = Ext.JSON.encode(hash);
-
-        Rally.data.PreferenceManager.update({
-            appID: this.getAppId(),
-            settings: prefs,
-            scope: this,
-            success: function(updatedRecords, notUpdatedRecords) {
-                this.logger.log('_setTargetAllocationHash save preferences',updatedRecords, notUpdatedRecords);
-            }
-        });
-    },
-    _getTargetAllocation: function(targetValue){
-        this.logger.log('_getTargetAllocation',targetValue);
-        if (targetValue && targetValue.length > 0){
-            return this.targetAllocationHash[targetValue] || 0;
-        }
-        return 0;
-    },
-    _initCategoryDataHash: function(){
+     _initCategoryDataHash: function(){
         var category_data = {},
             allowedValues = this._getTargetFieldValues();
 
@@ -368,7 +290,6 @@ Ext.define("PortfolioAlignment", {
             allowedValues = this._getTargetFieldValues(),
             targetField = this.chartSettings.categoryField,
             noneText = this.chartSettings.noneText,
-            //otherText = this.chartSettings.otherText,
             dataField = this.chartSettings.getChartTypeDataField(chartType),
             dataFieldAttribute = this.chartSettings.getChartTypeDataFieldAttribute(chartType);
 
@@ -458,9 +379,11 @@ Ext.define("PortfolioAlignment", {
             categories.push(this.chartSettings.noneText);
         }
 
+        var release = this.getContext().getTimeboxScope().getRecord(),
+            targetHash = this.allocationPreferences.getAllocationHash(release);
         Ext.each(categories, function(c){
             if (c && c.length > 0){
-                var val = this._getTargetAllocation(c);
+                var val = targetHash[c] || 0;
                 series_data.push({name: c, y: val, color: this.chartSettings.getLegendColor(c)});
             };
         }, this);
@@ -544,15 +467,17 @@ Ext.define("PortfolioAlignment", {
         return null;
     },
     _buildTargetDialog: function(){
-        this.logger.log('_buildTargetDialog', this.targetAllocationHash);
+        var release = this.getContext().getTimeboxScope().getRecord(),
+            appId = this.getAppId();
+        this.logger.log('_buildTargetDialog', release);
 
         Ext.create('Rally.technicalservices.dialog.TargetAllocation', {
-            targetAllocation: this.targetAllocationHash,
+            targetAllocation: this.allocationPreferences.getAllocationHash(release),
             listeners: {
                 scope: this,
                 allocationsupdate: function(updatedHash){
                     this.logger.log('allocations updated', updatedHash);
-                    this._setTargetAllocationHash(updatedHash);
+                    this.allocationPreferences.update(appId,this.portfolioItemType,release,updatedHash);
                     this._updateTargetChart();
                 }
             }
