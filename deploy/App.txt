@@ -3,11 +3,11 @@
 <head>
     <title>Portfolio Alignment</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Fri May 15 2015 17:26:10 GMT-0600 (MDT) -->
+    <!--  Build Date: Fri May 22 2015 14:15:50 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Fri May 15 2015 17:26:10 GMT-0600 (MDT)";
-        var CHECKSUM = 23542987150;
+        var APP_BUILD_DATE = "Fri May 22 2015 14:15:50 GMT-0700 (PDT)";
+        var CHECKSUM = 87543690950;
     </script>
     
     <script type="text/javascript" src="/apps/2.0/sdk.js"></script>
@@ -142,6 +142,7 @@ Ext.define('Rally.technicalservices.preferences.Allocation',{
     logger: new Rally.technicalservices.Logger(),
     noneText: 'None',
     allocationsByRelease: null,
+    project: null,
     /**
      *  {
      *      releaseKey1:  {
@@ -154,8 +155,10 @@ Ext.define('Rally.technicalservices.preferences.Allocation',{
      *  }
      *
      */
-    constructor: function(){
+    constructor: function(config){
         this.allocationsByRelease = {};
+        Ext.apply(this,config);
+
     },
     getAllocationHash: function(release){
 
@@ -169,7 +172,8 @@ Ext.define('Rally.technicalservices.preferences.Allocation',{
             var utcStartDate = Rally.util.DateTime.shiftTimezoneOffDate(startDate),
                 utcEndDate = Rally.util.DateTime.shiftTimezoneOffDate(endDate);
 
-            return Rally.util.DateTime.toIsoString(utcStartDate) + Rally.util.DateTime.toIsoString(utcEndDate) + release.get('Name');
+            var key =  Rally.util.DateTime.toIsoString(utcStartDate) + Rally.util.DateTime.toIsoString(utcEndDate) + release.get('Name');
+            return key.substring(0,254);
         } else {
             return "Unscheduled";
         }
@@ -182,11 +186,13 @@ Ext.define('Rally.technicalservices.preferences.Allocation',{
 
         Rally.data.PreferenceManager.load({
             appID: appId,
+            project: this.project,
             filterByName: portfolioItemType,
             scope: this,
             success: function(prefs) {
                 if (prefs[portfolioItemType]){
                     this.allocationsByRelease = Ext.JSON.decode(prefs[portfolioItemType]);
+                    this.logger.log('load preferences project',this.project, this.allocationsByRelease);
                 }
                 deferred.resolve();
             }
@@ -203,9 +209,11 @@ Ext.define('Rally.technicalservices.preferences.Allocation',{
         Rally.data.PreferenceManager.update({
             appID: appId,
             settings: prefs,
+            project: this.project,
             scope: this,
             success: function(updatedRecords, notUpdatedRecords) {
-                this.logger.log('_setTargetAllocationHash save preferences',updatedRecords, notUpdatedRecords);
+                this.logger.log('_setTargetAllocationHash save preferences',updatedRecords, notUpdatedRecords,
+                    'appId',appId,'project',this.project, 'settings',prefs,'release',this.getReleaseKey(release));
             }
         });
     },
@@ -243,6 +251,784 @@ Ext.define('Rally.technicalservices.preferences.Allocation',{
     }
 });
 
+/**
+ * Created by kcorkan on 5/22/15.
+ */
+Ext.define('Rally.app.AppSettings', {
+    extend: 'Ext.Container',
+    alias: 'widget.rallyappsettings',
+    requires: [
+        'Rally.ui.Button',
+        'Rally.data.wsapi.Filter',
+        'Rally.util.Ref',
+        'Rally.data.PreferenceManager',
+        'Rally.util.DeepCopy',
+        'Rally.app.SettingsFactory',
+        'Rally.app.settings.Loader',
+        'Rally.util.Help',
+        'Rally.util.Test',
+        'Rally.ui.CheckboxField',
+        'Rally.ui.plugin.HelpField',
+        'Rally.ui.dialog.ConfirmDialog'
+    ],
+
+    inheritableStatics: {
+        /**
+         * @private
+         * @property GLOBAL_SETTINGS
+         * These settings are always saved globally (app scoped)
+         */
+        GLOBAL_SETTINGS: ['title', 'project', 'projectScopeUp', 'projectScopeDown', 'autoResize']
+    },
+
+    componentCls: 'app-settings',
+
+    config: {
+        /**
+         * @cfg {Rally.app.Context} context The runtime context.  This is automatically provided
+         * to the app settings at the time of construction by its container.
+         */
+        context: undefined,
+
+        /**
+         * @cfg {Object[]} fields Config for fields to draw on the settings panel.
+         * @cfg {String} fields.type The type of field to draw, must be a valid type defined in Rally.app.SettingsFactory.
+         * @cfg {String} fields.name The name to give the setting, will be available to the app as myApp.getSetting(name)
+         * @cfg {String} fields.label The label of the field. Defaults to the given type (capitalized) if not provided.
+         * @cfg {String} field.initialValue A value to give the field if it hasn't been set yet
+         */
+        fields: [],
+
+        /**
+         * @cfg {Object[]} fields Config for user fields to draw on the settings panel.
+         * @cfg {String} fields.type The type of field to draw, must be a valid type defined in Rally.app.SettingsFactory.
+         * @cfg {String} fields.name The name to give the setting, will be available to the app as myApp.getSetting(name)
+         * @cfg {String} fields.label The label of the field. Defaults to the given type (capitalized) if not provided.
+         * @cfg {String} field.initialValue A value to give the field if it hasn't been set yet
+         */
+        userFields: [],
+
+        /**
+         * @cfg {Object} settings The current values to be applied to the fields rendered in this component
+         */
+        settings: {},
+
+        /**
+         * @cfg {Object} settings The default values to be applied to the fields rendered in this component
+         */
+        defaultSettings: {},
+
+        /**
+         * @cfg {Boolean} isEditable whether or not changes may be made.  If false the component will be rendered masked.
+         */
+        isEditable: true,
+
+        /**
+         * @cfg {String} settingsScope the scope with which settings will be persisted.
+         * May be one of "app", "workspace", "project"
+         */
+        settingsScope: 'app',
+
+        /**
+         * @cfg {Boolean} shouldInjectTitleField Whether to inject a title field.
+         * set to true if you want AppSettings to automatically inject title if not present
+         */
+        shouldInjectTitleField: false
+    },
+
+    _currentScope: null,
+
+    constructor: function(config) {
+        Ext.applyIf(config.settings, config.defaultSettings);
+        this.initialSettings = Ext.clone(config.settings);
+
+        this.callParent(arguments);
+    },
+
+    initComponent: function() {
+        this.callParent(arguments);
+
+        this.addEvents(
+            /**
+             * @event
+             * Fired when the settings have been saved and the app view should show again.
+             * @param {Object} settings the settings that were saved
+             */
+            'save',
+
+            /**
+             * @event
+             * Fired when the cancel button has been clicked and the app view should show again.
+             */
+            'cancel',
+
+            /**
+             * @event
+             * Fired when all of the appsettings components have fired their ready event.
+             */
+            'appsettingsready'
+        );
+
+        this.isReady = {};
+
+        this._loadPreferenceModel();
+    },
+
+    /**
+     * @param settingsFields {Object[]} Field configs to add.
+     */
+    addSettingsFields: function(fields) {
+        this.addFieldsToCmp(this.down('#scopedSettingsForm'), fields);
+    },
+
+    /**
+     * @param cmp {Ext.Container} Container to add fields to.
+     * @param fields {Object[]} Field configs to add.
+     */
+    addFieldsToCmp: function(cmp, fields) {
+        var drawFieldForCmp = _.curry(this._drawField)(cmp);
+        _.each(fields, drawFieldForCmp, this);
+    },
+
+    _loadPreferenceModel: function() {
+        console.log('_loadPreferenceModel');
+        Rally.data.ModelFactory.getModel({
+            type: 'Preference',
+            success: function(model) {
+                this._preferenceModel = model;
+                this._loadPreferences({
+                    callback: this._preferencesRetrieved,
+                    scope: this
+                });
+            },
+            scope: this});
+    },
+
+    _drawForms: function() {
+        var disableAppScopedSettings = false,
+            disableScopedSettings = false,
+            permissions =  this.context.getPermissions(),
+            isCurrentProjectAdmin = permissions && permissions.isProjectAdmin(this._getCurrentContext().getProject()),
+            hasAppScopedSettings = this._getAppScopedSettingsFields().length,
+            hasWorkspaceOrProjectSettings = (this.settingsScope !== 'app' && this._getScopedSettingsFields().length),
+            hasNonUserScopedSettings = hasAppScopedSettings || hasWorkspaceOrProjectSettings;
+
+        if (!this.isEditable && this.settingsScope === 'project' && isCurrentProjectAdmin) {
+            this.isEditable = true;
+            disableAppScopedSettings = true;
+        }
+
+        // eventually will get rid of this hack with some new design work...using this so we can mask only
+        // these sections when a user does not have permission to edit these sections
+        if (hasNonUserScopedSettings) {
+            this.add({
+                xtype: 'container',
+                itemId: 'nonUserScopedSettingsContainer'
+            });
+        }
+
+        if (hasAppScopedSettings) {
+            this._drawAppSettingsForm(disableAppScopedSettings);
+        }
+
+        if (hasWorkspaceOrProjectSettings) {
+            this._drawWorkspaceOrProjectSettingsForm(disableScopedSettings);
+        }
+
+        if (this.getUserFields() && this.getUserFields().length) {
+            this._drawUserSettingsForm();
+        }
+    },
+
+    _getDefaultFormConfig: function() {
+        return {
+            xtype: 'form',
+            cls: 'settings-form',
+            border: false,
+            manageHeight: false
+        };
+    },
+
+    _drawAppSettingsForm: function(disableAppScopedSettings) {
+        this.down('#nonUserScopedSettingsContainer').add([
+            {
+                xtype: 'component',
+                itemId: 'settingsTitle',
+                disabled: disableAppScopedSettings,
+                html: (this.settingsScope !== 'app') && this._getScopedSettingsFields().length ? 'Global Settings' : 'Settings',
+                cls: 'settings-title'
+            },
+            Ext.apply({
+                itemId: 'settingsForm',
+                disabled: disableAppScopedSettings,
+                listeners: {
+                    initialload: this._projectScopeAvailable,
+                    scopechanged: this._raiseProjectScopeChanged,
+                    scope: this
+                }
+            }, this._getDefaultFormConfig())
+        ]);
+    },
+
+    _drawWorkspaceOrProjectSettingsForm: function(disableScopedSettings) {
+        this.down('#nonUserScopedSettingsContainer').add([
+            {
+                xtype: 'component',
+                itemId: 'scopedSettingsTitle',
+                disabled: disableScopedSettings,
+                html: ((this.settingsScope === 'project' && this._getCurrentContext().getProject().Name) ||
+                (this.settingsScope === 'workspace' && this._getCurrentContext().getWorkspace().Name)) + ' Settings',
+                cls: 'settings-title scoped'
+            },
+            Ext.apply({
+                itemId: 'scopedSettingsForm',
+                disabled: disableScopedSettings
+            }, this._getDefaultFormConfig())
+        ]);
+    },
+
+    _drawUserSettingsForm: function() {
+        this.add([
+            {
+                xtype: 'component',
+                html: 'My Settings',
+                itemId: 'userSettingsTitle',
+                cls: 'settings-title user-scoped'
+            },
+            Ext.apply({
+                itemId: 'userScopedSettingsForm'
+            }, this._getDefaultFormConfig())
+        ]);
+    },
+
+    _hasProjectPicker: function() {
+        return _.some(this.getFields(), {type: 'project'});
+    },
+
+    _projectScopeAvailable: function(picker, scopeRecord) {
+        if (this.settingsScope !== 'app') {
+            this._currentScope = scopeRecord;
+            this._drawScopedSettings();
+        }
+    },
+
+    _loadPreferences: function(options) {
+        console.log('_loadPreferences');
+        if (this.getContext() && this.getContext().get('appID')) {
+            Rally.app.settings.Loader.load({
+                callback: options.callback,
+                context: this._getCurrentContext(),
+                scope: options.scope,
+                settingsScope: this.settingsScope
+            });
+        } else {
+            Ext.callback(options.callback, options.scope, [{}]);
+        }
+    },
+
+    _preferencesRetrieved: function(settings) {
+        console.log('_preferencesRetrieved');
+        this.isReady.canInvoke = true;
+
+        this.setSettings(Ext.apply({}, settings, this.settings));
+        this._injectTitleField();
+        this._drawForms();
+
+        this._drawAppScopedSettings();
+        if (this.settingsScope !== 'app' && !this._hasProjectPicker()) {
+            this._drawScopedSettings();
+        }
+        this._drawUserScopedSettings();
+        this._fireReady();
+
+        this._onAppSettingsReady();
+    },
+
+    _raiseProjectScopeChanged: function(project, scopeRecord) {
+        this._currentScope = scopeRecord;
+
+        if (this.settingsScope === 'project') {
+            this.setLoading(true);
+
+            this.down('#scopedSettingsForm').items.each(this._removeFieldEventHandlers, this);
+            this.down('#scopedSettingsForm').removeAll(true);
+
+            this._loadPreferences({
+                callback: this._redrawProjectSettings,
+                scope: this
+            });
+        } else {
+            this.fireEvent('projectscopechanged', this._getCurrentContext());
+        }
+    },
+
+    _removeFieldEventHandlers: function(field) {
+        Ext.Object.each(field.handlesEvents, function(event, handler) {
+            this.un(event, handler, field);
+        }, this);
+    },
+
+    _redrawProjectSettings: function(settings) {
+        this.setSettings(Ext.apply({}, settings, this.defaultSettings));
+        this._drawScopedSettings();
+        this.setLoading(false);
+    },
+
+    _injectTitleField: function() {
+        if (this.getShouldInjectTitleField() && !_.some(this.getFields(), {name: 'title'})) {
+            this.getFields().unshift({
+                type: 'text',
+                name: 'title',
+                label: 'Title'
+            });
+        }
+    },
+
+    _getAppScopedSettingsFields: function() {
+        var appScopedSettingsFields = _.filter(this.getFields(), function(fieldConfig) {
+            return this._isGlobalSettingsField(fieldConfig) || this.settingsScope === 'app';
+        }, this);
+
+        if (this.isEditable && this.settingsScope === 'project' && this.getContext().getPermissions().isWorkspaceOrSubscriptionAdmin()) {
+            appScopedSettingsFields.push({
+                xtype: 'rallycheckboxfield',
+                plugins: [
+                    {
+                        ptype: 'rallyhelpfield',
+                        helpId: 276,
+                        helpText: 'more info'
+                    }
+                ],
+                boxLabel: 'Check this box to update the default settings for this app across the Workspace. If this box is not checked, settings will be applied for the current Project only.',
+                boxLabelCls: 'default-settings-box-label',
+                cls: 'default-settings-checkbox',
+                itemId: 'defaultSettingsCheckbox',
+                label: 'Default Settings',
+                submitValue: false
+            });
+        }
+
+        return appScopedSettingsFields;
+    },
+
+    _getScopedSettingsFields: function() {
+        return _.filter(this.getFields(), function(fieldConfig) {
+            return this.settingsScope !== 'app' && !this._isGlobalSettingsField(fieldConfig);
+        }, this);
+    },
+
+    _drawAppScopedSettings: function() {
+        this.addFieldsToCmp(this.getAppScopedSettingsForm(), this._getAppScopedSettingsFields());
+    },
+
+    _drawScopedSettings: function() {
+        var scopedSettingsFields = this._getScopedSettingsFields();
+        if (scopedSettingsFields.length) {
+            var scopeName = this.settingsScope === 'project' ? this._getCurrentContext().getProject().Name : this._getCurrentContext().getWorkspace().Name;
+            this.down('#scopedSettingsTitle').update(scopeName + ' Settings');
+            this.addSettingsFields(scopedSettingsFields);
+        }
+    },
+
+    _drawUserScopedSettings: function() {
+        if (this.getUserFields() && this.getUserFields().length) {
+            this.addFieldsToCmp(this.down('#userScopedSettingsForm'), this.getUserFields());
+        }
+    },
+
+    _isGlobalSettingsField: function(fieldConfig) {
+        return _.contains(this.self.GLOBAL_SETTINGS, fieldConfig.name) ||
+            _.contains(this.self.GLOBAL_SETTINGS, fieldConfig.type);
+    },
+
+    _drawField: function(form, fieldConfig) {
+        var field = this._createFieldFromConfig(fieldConfig);
+        this._applyScopeToField(field);
+        this._addFieldToForm(form, field, fieldConfig);
+    },
+
+    _getValueForField: function(field, fieldName, settings) {
+        var value;
+        if (field.mapsToMultiplePreferenceKeys) {
+            value = {};
+            Ext.each(field.mapsToMultiplePreferenceKeys, function(name) {
+                value[name] = settings[name];
+            });
+        } else {
+            value = settings[fieldName];
+        }
+        return value;
+    },
+
+    _createFieldFromConfig: function(fieldConfig) {
+        if (fieldConfig.storeConfig && fieldConfig.storeConfig.autoLoad) {
+            throw "Field Config for App Settings components should not auto load the store. Store will be loaded from the App Settings panel after init.";
+        }
+
+        var field = Ext.apply({}, Rally.app.SettingsFactory.getEditorConfig(fieldConfig.type) || fieldConfig);
+        var fieldName = fieldConfig.name || fieldConfig.type;
+        var fieldValue = this._getValueForField(field, fieldName, this.settings) || fieldConfig.initialValue;
+
+        Ext.apply(field, fieldConfig.config);
+        Ext.applyIf(field, {
+            fieldLabel: fieldConfig.label || (fieldConfig.name && Ext.util.Format.capitalize(fieldConfig.name)) || (fieldConfig.type && Ext.util.Format.capitalize(fieldConfig.type)),
+            name: fieldName,
+            labelWidth: 75,
+            labelSeparator: '',
+            value: fieldValue
+        });
+
+        return field;
+    },
+
+    _addFieldToForm: function(form, field, fieldConfig) {
+        var fieldCmp = form.add(field);
+        fieldCmp.addCls(Rally.util.Test.toBrowserTestCssClass('settings-' + fieldConfig.type));
+        this._handleReady(fieldCmp);
+        this._connectFieldEventHandlers(fieldCmp);
+
+        if (fieldCmp.getStore && fieldCmp.getStore()) {
+            fieldCmp.getStore().load();
+        }
+
+        return fieldCmp;
+    },
+
+    _handleReady: function(field) {
+        if (field.readyEvent) {
+            this.isReady[field.getId()] = false;
+            field.on(field.readyEvent, function() {
+                this._markReady(field.getId());
+            }, this);
+        }
+    },
+
+    _markReady: function(id) {
+        this.isReady[id] = true;
+        this._fireReady();
+    },
+
+    _fireReady: function() {
+        var fireReady = true;
+        Ext.Object.each(this.isReady, function(fieldId) {
+            fireReady = fireReady && this.isReady[fieldId];
+        }, this);
+
+        if (fireReady) {
+            this._onAppSettingsReady();
+        }
+    },
+
+    afterRender: function() {
+        this.callParent(arguments);
+        this._fireReady();
+    },
+
+    _onAppSettingsReady: function () {
+        console.log('_onAppSettingsReady', this.rendered, this.isEditable, this.getUserFields(), this.isReady, this.isReady.canInvoke);
+        if (this.rendered && this.isReady.canInvoke) {
+            if (this.isEditable || !Ext.isEmpty(this.getUserFields())) {
+                this._drawSaveAndCancelButtons();
+            }
+            if (!this.isEditable) {
+                this._maskSettings();
+            }
+            this.fireEvent('appsettingsready', this);
+            this.isReady.canInvoke = false;
+        }
+    },
+
+    _connectFieldEventHandlers: function(field) {
+        if (field.handlesEvents) {
+            Ext.Object.each(field.handlesEvents, function(event, handler) {
+                this.on(event, handler, field);
+            }, this);
+        }
+    },
+
+    _applyScopeToField: function(field) {
+        field.context = this._getCurrentContext();
+
+        if (field.storeConfig) {
+            if (field.storeConfig.context) {
+                Ext.applyIf(field.storeConfig.context, {
+                    project: this._getCurrentProjectScope()
+                });
+            } else {
+                Ext.applyIf(field.storeConfig, {
+                    context: {
+                        project: this._getCurrentProjectScope()
+                    }
+                });
+            }
+        }
+    },
+
+    _getCurrentContext: function() {
+        var currentContext = null;
+
+        if (Ext.isFunction(this.getContext().clone)) {
+            currentContext = this.getContext().clone();
+        } else {
+            currentContext = Ext.clone(this.getContext());
+        }
+
+        if (this._currentScope !== null) {
+            if (this._currentScope) {
+                currentContext.put('project', this._currentScope.raw);
+                currentContext.put('workspace', this._currentScope.raw.Workspace);
+            } else {
+                currentContext.put('project', Rally.environment.getContext().getProject());
+                currentContext.put('workspace', Rally.environment.getContext().getWorkspace());
+            }
+        }
+        return currentContext;
+    },
+
+    _getCurrentProjectScope: function() {
+        return Rally.util.Ref.getRelativeUri(this._getCurrentContext().getProject());
+    },
+
+    _getCurrentWorkspaceScope: function() {
+        return Rally.util.Ref.getRelativeUri(this._getCurrentContext().getWorkspace());
+    },
+
+    _onSaveSuccess: function(records) {
+        this.fireEvent('save', this.settings, records);
+    },
+
+    save: function() {
+        if (!_.every(this.query('form'), function(form) {
+                return form.getForm().isValid();
+            })) {
+            return;
+        }
+
+        if(this._shouldApplyDefaults()){
+            Ext.create('Rally.ui.dialog.ConfirmDialog', {
+                confirmLabel: 'OK',
+                listeners: {
+                    confirm: this._saveScopedSettings,
+                    scope: this
+                },
+                message: 'You are about to apply settings at the Workspace level. ' +
+                'These settings will become the default for this app. ' +
+                'Existing Project-level settings will be preserved. ' +
+                Rally.util.Help.getLinkTag({id: 276, text: 'more info'})
+            });
+        }else{
+            this._saveScopedSettings();
+        }
+    },
+
+    _saveScopedSettings: function() {
+        var saveSettingsPromises = [],
+            appScopedSettingsForm = this.getAppScopedSettingsForm();
+
+        if (appScopedSettingsForm && !appScopedSettingsForm.isDisabled() && Ext.Object.getSize(appScopedSettingsForm.getValues())) {
+            saveSettingsPromises.push(this._saveAppGlobalScopedSettings());
+        }
+
+        if (!Ext.isEmpty(this._getScopedSettingsFields())) {
+            saveSettingsPromises.push(this._saveAppProjectScopedSettings());
+        }
+
+        if (!Ext.isEmpty(this.getUserFields())) {
+            saveSettingsPromises.push(this._saveUserScopedSettings());
+        }
+
+        return Deft.Promise.all(saveSettingsPromises).then({
+            success: function(recordSets) {
+                var records = _.uniq(_.reduce(recordSets, function(result, recordSet) {
+                    return result.concat(recordSet);
+                }, []));
+
+                this._onSaveSuccess(records);
+                return records;
+            },
+            scope: this
+        });
+    },
+
+    _saveSettings: function(options) {
+        return this.getContext() && this.getContext().get('appID') ?
+            Rally.data.PreferenceManager.update(options) :
+            Deft.Promise.when([]);
+    },
+
+    _saveAppGlobalScopedSettings: function() {
+        var globalAppSettings = this.getAppScopedSettingsForm().getValues();
+        Ext.apply(this.settings, globalAppSettings);
+
+        return this._saveSettings({
+            appID: this.getContext() && this.getContext().get('appID'),
+            settings: globalAppSettings,
+            project: null,
+            workspace: null,
+            scope: this
+        });
+    },
+
+    _saveAppProjectScopedSettings: function() {
+        var scopedSettings = this.down('#scopedSettingsForm').getValues();
+        Ext.apply(this.settings, scopedSettings);
+
+        var updateOptions = {
+            appID: this.getContext() && this.getContext().get('appID'),
+            settings: scopedSettings,
+            scope: this
+        };
+
+        if (this.settingsScope === 'workspace' || this._shouldApplyDefaults()) {
+            updateOptions.workspace = this._getCurrentWorkspaceScope();
+        } else if (this.settingsScope === 'project') {
+            updateOptions.project = this._getCurrentProjectScope();
+        }
+
+        return this._saveSettings(updateOptions);
+    },
+
+    _saveUserScopedSettings: function() {
+        var userSettings = this.getUserScopedSettingsForm().getValues();
+        Ext.apply(this.settings, userSettings);
+
+        return this._saveSettings({
+            appID: this.getContext() && this.getContext().get('appID'),
+            settings: userSettings,
+            filterByUser: true,
+            project: null,
+            workspace: this._getCurrentWorkspaceScope(),
+            scope: this
+        });
+    },
+
+    getAppScopedSettingsForm: function(){
+        return this.down('#settingsForm');
+    },
+
+    getUserScopedSettingsForm: function(){
+        return this.down('#userScopedSettingsForm');
+    },
+
+    getApplyDefaultsCheckbox: function(){
+        return this.down('#defaultSettingsCheckbox');
+    },
+
+    _shouldApplyDefaults: function(){
+        return this.getApplyDefaultsCheckbox() && this.getApplyDefaultsCheckbox().getValue();
+    },
+
+    hasChanges: function() {
+        if (!this.isEditable) {
+            return false;
+        }
+        return _.some(this.query('form'), this._formHasChanges, this);
+    },
+
+    _formHasChanges: function(form) {
+        var hasChanges = false;
+
+        Ext.Object.each(form.getValues(), function(name, value) {
+            var setting = new this._preferenceModel({Value: value});
+            if (this.initialSettings[name] !== setting.get('Value')) {
+                hasChanges = true;
+                return false;
+            }
+        }, this);
+        return hasChanges;
+    },
+
+    _drawSaveAndCancelButtons: function() {
+        this.add({
+            xtype: 'container',
+            padding: '6 0 0 0',
+            height: 35,
+            layout: {
+                type: 'vbox',
+                align: 'center'
+            },
+            items: {
+                xtype: 'container',
+                cls: 'center',
+                items: [
+                    {
+                        xtype: 'rallybutton',
+                        text: 'Save',
+                        cls: 'save-button primary rly-small',
+                        listeners: {
+                            click: this.save,
+                            scope: this
+                        }
+                    },
+                    {
+                        xtype: 'rallybutton',
+                        text: 'Cancel',
+                        cls: 'secondary rly-small',
+                        ui: 'link',
+                        listeners: {
+                            click: function() {
+                                this.fireEvent('cancel');
+                            },
+                            scope: this
+                        }
+                    }
+                ]
+            }
+        });
+    },
+
+    _getAllFormItems: function() {
+        function getItems(cmp) {
+            return cmp.items && cmp.items.items ?
+                cmp.items.items : cmp.items;
+        }
+
+        var settingsForm = this.down('#settingsForm'),
+            scopedSettingsForm = this.down('#scopedSettingsForm'),
+            items = [];
+
+        if (settingsForm) {
+            items = items.concat(getItems(settingsForm));
+        }
+
+        if (scopedSettingsForm) {
+            items = items.concat(getItems(scopedSettingsForm));
+        }
+
+        return items;
+    },
+
+    _maskSettings: function() {
+        var maskContainer = this.down('#nonUserScopedSettingsContainer');
+        if (maskContainer) {
+            var mask = maskContainer.setLoading({useMsg: false}),
+                items = this._getAllFormItems();
+
+            if (items.length) {
+                this._sendPickersBehindCmp(mask, items);
+            }
+        }
+    },
+
+    /**
+     * @private
+     *  Sends all pickers in items behind cmp
+     *  Useful for sending the pickers behind a mask
+     *
+     *  @param cmp {Ext.Component} Component to send the pickers behind
+     *  @param items {Ext.Component[]} Child components to look through for pickers
+     */
+    _sendPickersBehindCmp: function(cmp, items) {
+        var pickerRE = /picker$/,
+            pickerFields = _.filter(items, function(field) {
+                return pickerRE.test(field.xtype);
+            });
+
+        _.each(pickerFields, function(pickerField) {
+            cmp.zIndexManager.sendToBack(pickerField.getPicker());
+        });
+    }
+});
 Ext.define('Rally.technicalservices.PortfolioAlignmentSettings',{
 
     chartColors: [ '#2f7ed8', '#8bbc21', '#910000',
@@ -256,14 +1042,15 @@ Ext.define('Rally.technicalservices.PortfolioAlignmentSettings',{
     otherText: 'Other',
     otherColor: '#363636',
 
+    persistAllocationsByProject: true,
     categoryField: 'InvestmentCategory',
 
     chartType: {
         targeted: {
-            title: 'Investment Planning Targets',
+            title: 'Investment Planning Targets for {0}',
             field: '',
             display: true,
-            toolTip: 'Desired investment allocation for {0} in the selected release.  <br/><br/>Click <b><i>Configure Targets...</i></b> to change the target allocations. Target Allocations will be saved to preferences for the selected PortfolioItem Type.  Allocations must add up to 100%.'
+            toolTip: 'Desired investment allocation for {0} in the selected release.  <br/><br/>Click <b><i>Configure Targets...</i></b> to change the target allocations. Target Allocations will be saved to preferences for the selected Release and {1}.  Allocations must add up to 100%.'
         },
         planned: {
             title: 'Preliminary Feature Estimates',
@@ -291,7 +1078,15 @@ Ext.define('Rally.technicalservices.PortfolioAlignmentSettings',{
     showDataLabels: true,
     dataLabelDistance: 1,
     dataLabelColor: 'black',
-
+    constructor: function(config){
+        Ext.apply(this,config);
+    },
+    _getScopeText: function(){
+        if (this.persistAllocationsByProject === true){
+            return 'Project';
+        }
+        return 'Workspace';
+    },
     setLegendColors: function(legendColorHash){
         legendColorHash[this.noneText] = this.noneColor;
       //  legendColorHash[this.otherText] = this.otherColor;
@@ -321,12 +1116,17 @@ Ext.define('Rally.technicalservices.PortfolioAlignmentSettings',{
     },
     getChartTitle: function(chartType){
         if (this.chartType[chartType]){
+            if (chartType == 'targeted'){
+                return Ext.String.format(this.chartType[chartType].title || chartType, this._getScopeText());
+            }
             return this.chartType[chartType].title || chartType;
         }
         return chartType;
     },
     getToolTip: function(chartType, portfolioItemType){
-        var toolTip = Ext.String.format(this.chartType[chartType].toolTip || Ext.String.format("No tool tip found.",chartType), portfolioItemType);
+        var toolTip = Ext.String.format(this.chartType[chartType].toolTip || Ext.String.format("No tool tip found.",chartType), portfolioItemType, this._getScopeText());
+        if (chartType == 'targeted'){
+        }
         return Ext.String.format("<b>{0}</b>:  {1}",
             this.getChartTitle(chartType), toolTip);
     },
@@ -433,6 +1233,7 @@ Ext.define("PortfolioAlignment", {
     componentCls: 'app',
     logger: new Rally.technicalservices.Logger(),
     items: [
+        {xtype: 'container', itemId: 'settings_box'},
         {xtype: 'container', itemId: 'ct-header',cls: 'header', layout: {type: 'hbox'}},
         {xtype: 'container',itemId:'ct-display', layout:{type: 'hbox'}},
         {xtype: 'container',
@@ -460,7 +1261,11 @@ Ext.define("PortfolioAlignment", {
      * PortfolioAlignment app settings
      */
     portfolioItemFetchFields: ['Name','ObjectID','FormattedID','AcceptedLeafStoryPlanEstimateTotal','LeafStoryPlanEstimateTotal','PreliminaryEstimate','Value'],
-
+    config: {
+        defaultSettings: {
+            persistAllocationsForProject:  false
+        }
+    },
     chartSettings: null,
 
     onNoAvailableTimeboxes: function(){
@@ -522,8 +1327,11 @@ Ext.define("PortfolioAlignment", {
      },
     launch: function(){
         this.callParent();
-        this.chartSettings = Ext.create('Rally.technicalservices.PortfolioAlignmentSettings',{});
-        this._addComponents();
+        if (this.isExternal()){
+            this.showSettings(this.config);
+        } else {
+            this.onSettingsUpdate(this.getSettings());  //(this.config.type,this.config.pageSize,this.config.fetch,this.config.columns);
+        }
    },
     getHeader: function() {
         return this.down('container[cls=header]');
@@ -567,10 +1375,18 @@ Ext.define("PortfolioAlignment", {
                             }, this);
                             this.chartSettings.setLegendColors(legendColors);
                             this.targetFieldValues = values;
+
+                            var projectRef = this.chartSettings.persistAllocationsByProject ?
+                                this.getContext().getProjectRef() : null;
+
+                            this.logger.log('project persistence settings', this.chartSettings.persistAllocationsByProject,
+                                projectRef, this.getContext().getProjectRef());
+
                             this.allocationPreferences = Ext.create('Rally.technicalservices.preferences.Allocation',{
-                                noneText: this.noneText
+                                noneText: this.noneText,
+                                project: projectRef
                             });
-                            this.allocationPreferences.load(this.getAppId(),this.portfolioItemType,values).then({
+                           this.allocationPreferences.load(this.getAppId(),this.portfolioItemType,values).then({
                                 scope: this,
                                 success: function(){
                                     this._updateApp();
@@ -912,6 +1728,62 @@ Ext.define("PortfolioAlignment", {
                 }
             }
          });
+    },
+    /********************************************
+     /* Overrides for App class
+     /*
+     /********************************************/
+    //getSettingsFields:  Override for App
+    getSettingsFields: function() {
+
+        return [{
+            name: 'persistAllocationsForProject',
+            xtype: 'rallycheckboxfield',
+            fieldLabel: 'Persist Allocations for Project',
+            labelAlign: 'right',
+            labelWidth: 200,
+            readyEvent: 'afterrender'
+        }];
+    },
+
+    isExternal: function(){
+        return typeof(this.getAppId()) == 'undefined';
+    },
+    //showSettings:  Override
+    showSettings: function(options) {
+        this._appSettings = Ext.create('Rally.app.AppSettings', Ext.apply({
+            settings: this.getSettings(),
+            defaultSettings: this.getDefaultSettings(),
+            context: this.getContext(),
+            settingsScope: this.settingsScope,
+            autoScroll: true,
+            fields: this.getSettingsFields()
+        }, options));
+
+      //  this._appSettings.addSettingsFields(this.getSettingsFields());
+
+        this._appSettings.on('cancel', this._hideSettings, this);
+        this._appSettings.on('save', this._onSettingsSaved, this);
+        if (this.isExternal()){
+            if (this.down('#settings_box').getComponent(this._appSettings.id)==undefined){
+                this.down('#settings_box').add(this._appSettings);
+            }
+        } else {
+            this.hide();
+            this.up().add(this._appSettings);
+        }
+        return this._appSettings;
+    },
+    _onSettingsSaved: function(settings){
+        Ext.apply(this.settings, settings);
+        this._hideSettings();
+        this.onSettingsUpdate(settings);
+    },
+    onSettingsUpdate: function (settings){
+        this.chartSettings = Ext.create('Rally.technicalservices.PortfolioAlignmentSettings',{
+            persistAllocationsByProject: this.getSetting('persistAllocationsForProject')
+        });
+        this._addComponents();
     }
 });
 

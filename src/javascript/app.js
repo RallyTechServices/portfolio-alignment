@@ -3,6 +3,7 @@ Ext.define("PortfolioAlignment", {
     componentCls: 'app',
     logger: new Rally.technicalservices.Logger(),
     items: [
+        {xtype: 'container', itemId: 'settings_box'},
         {xtype: 'container', itemId: 'ct-header',cls: 'header', layout: {type: 'hbox'}},
         {xtype: 'container',itemId:'ct-display', layout:{type: 'hbox'}},
         {xtype: 'container',
@@ -30,7 +31,11 @@ Ext.define("PortfolioAlignment", {
      * PortfolioAlignment app settings
      */
     portfolioItemFetchFields: ['Name','ObjectID','FormattedID','AcceptedLeafStoryPlanEstimateTotal','LeafStoryPlanEstimateTotal','PreliminaryEstimate','Value'],
-
+    config: {
+        defaultSettings: {
+            persistAllocationsForProject:  false
+        }
+    },
     chartSettings: null,
 
     onNoAvailableTimeboxes: function(){
@@ -92,8 +97,11 @@ Ext.define("PortfolioAlignment", {
      },
     launch: function(){
         this.callParent();
-        this.chartSettings = Ext.create('Rally.technicalservices.PortfolioAlignmentSettings',{});
-        this._addComponents();
+        if (this.isExternal()){
+            this.showSettings(this.config);
+        } else {
+            this.onSettingsUpdate(this.getSettings());  //(this.config.type,this.config.pageSize,this.config.fetch,this.config.columns);
+        }
    },
     getHeader: function() {
         return this.down('container[cls=header]');
@@ -137,10 +145,18 @@ Ext.define("PortfolioAlignment", {
                             }, this);
                             this.chartSettings.setLegendColors(legendColors);
                             this.targetFieldValues = values;
+
+                            var projectRef = this.chartSettings.persistAllocationsByProject ?
+                                this.getContext().getProjectRef() : null;
+
+                            this.logger.log('project persistence settings', this.chartSettings.persistAllocationsByProject,
+                                projectRef, this.getContext().getProjectRef());
+
                             this.allocationPreferences = Ext.create('Rally.technicalservices.preferences.Allocation',{
-                                noneText: this.noneText
+                                noneText: this.noneText,
+                                project: projectRef
                             });
-                            this.allocationPreferences.load(this.getAppId(),this.portfolioItemType,values).then({
+                           this.allocationPreferences.load(this.getAppId(),this.portfolioItemType,values).then({
                                 scope: this,
                                 success: function(){
                                     this._updateApp();
@@ -482,5 +498,61 @@ Ext.define("PortfolioAlignment", {
                 }
             }
          });
+    },
+    /********************************************
+     /* Overrides for App class
+     /*
+     /********************************************/
+    //getSettingsFields:  Override for App
+    getSettingsFields: function() {
+
+        return [{
+            name: 'persistAllocationsForProject',
+            xtype: 'rallycheckboxfield',
+            fieldLabel: 'Persist Allocations for Project',
+            labelAlign: 'right',
+            labelWidth: 200,
+            readyEvent: 'afterrender'
+        }];
+    },
+
+    isExternal: function(){
+        return typeof(this.getAppId()) == 'undefined';
+    },
+    //showSettings:  Override
+    showSettings: function(options) {
+        this._appSettings = Ext.create('Rally.app.AppSettings', Ext.apply({
+            settings: this.getSettings(),
+            defaultSettings: this.getDefaultSettings(),
+            context: this.getContext(),
+            settingsScope: this.settingsScope,
+            autoScroll: true,
+            fields: this.getSettingsFields()
+        }, options));
+
+      //  this._appSettings.addSettingsFields(this.getSettingsFields());
+
+        this._appSettings.on('cancel', this._hideSettings, this);
+        this._appSettings.on('save', this._onSettingsSaved, this);
+        if (this.isExternal()){
+            if (this.down('#settings_box').getComponent(this._appSettings.id)==undefined){
+                this.down('#settings_box').add(this._appSettings);
+            }
+        } else {
+            this.hide();
+            this.up().add(this._appSettings);
+        }
+        return this._appSettings;
+    },
+    _onSettingsSaved: function(settings){
+        Ext.apply(this.settings, settings);
+        this._hideSettings();
+        this.onSettingsUpdate(settings);
+    },
+    onSettingsUpdate: function (settings){
+        this.chartSettings = Ext.create('Rally.technicalservices.PortfolioAlignmentSettings',{
+            persistAllocationsByProject: this.getSetting('persistAllocationsForProject')
+        });
+        this._addComponents();
     }
 });

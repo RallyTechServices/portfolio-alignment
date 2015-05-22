@@ -2,6 +2,7 @@ Ext.define('Rally.technicalservices.preferences.Allocation',{
     logger: new Rally.technicalservices.Logger(),
     noneText: 'None',
     allocationsByRelease: null,
+    project: null,
     /**
      *  {
      *      releaseKey1:  {
@@ -14,8 +15,10 @@ Ext.define('Rally.technicalservices.preferences.Allocation',{
      *  }
      *
      */
-    constructor: function(){
+    constructor: function(config){
         this.allocationsByRelease = {};
+        Ext.apply(this,config);
+
     },
     getAllocationHash: function(release){
 
@@ -29,7 +32,8 @@ Ext.define('Rally.technicalservices.preferences.Allocation',{
             var utcStartDate = Rally.util.DateTime.shiftTimezoneOffDate(startDate),
                 utcEndDate = Rally.util.DateTime.shiftTimezoneOffDate(endDate);
 
-            return Rally.util.DateTime.toIsoString(utcStartDate) + Rally.util.DateTime.toIsoString(utcEndDate) + release.get('Name');
+            var key =  Rally.util.DateTime.toIsoString(utcStartDate) + Rally.util.DateTime.toIsoString(utcEndDate) + release.get('Name');
+            return key.substring(0,254);
         } else {
             return "Unscheduled";
         }
@@ -42,11 +46,13 @@ Ext.define('Rally.technicalservices.preferences.Allocation',{
 
         Rally.data.PreferenceManager.load({
             appID: appId,
+            project: this.project,
             filterByName: portfolioItemType,
             scope: this,
             success: function(prefs) {
                 if (prefs[portfolioItemType]){
                     this.allocationsByRelease = Ext.JSON.decode(prefs[portfolioItemType]);
+                    this.logger.log('load preferences project',this.project, this.allocationsByRelease);
                 }
                 deferred.resolve();
             }
@@ -63,9 +69,11 @@ Ext.define('Rally.technicalservices.preferences.Allocation',{
         Rally.data.PreferenceManager.update({
             appID: appId,
             settings: prefs,
+            project: this.project,
             scope: this,
             success: function(updatedRecords, notUpdatedRecords) {
-                this.logger.log('_setTargetAllocationHash save preferences',updatedRecords, notUpdatedRecords);
+                this.logger.log('_setTargetAllocationHash save preferences',updatedRecords, notUpdatedRecords,
+                    'appId',appId,'project',this.project, 'settings',prefs,'release',this.getReleaseKey(release));
             }
         });
     },
