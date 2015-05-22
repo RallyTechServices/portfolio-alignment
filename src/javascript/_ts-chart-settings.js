@@ -11,14 +11,15 @@ Ext.define('Rally.technicalservices.PortfolioAlignmentSettings',{
     otherText: 'Other',
     otherColor: '#363636',
 
+    persistAllocationsByProject: true,
     categoryField: 'InvestmentCategory',
 
     chartType: {
         targeted: {
-            title: 'Investment Planning Targets',
+            title: 'Investment Planning Targets for {0}',
             field: '',
             display: true,
-            toolTip: 'Desired investment allocation for {0} in the selected release.  <br/><br/>Click <b><i>Configure Targets...</i></b> to change the target allocations. Target Allocations will be saved to preferences for the selected PortfolioItem Type.  Allocations must add up to 100%.'
+            toolTip: 'Desired investment allocation for {0} in the selected release.  <br/><br/>Click <b><i>Configure Targets...</i></b> to change the target allocations. Target Allocations will be saved to preferences for the selected Release and {1}.  Allocations must add up to 100%.'
         },
         planned: {
             title: 'Preliminary Feature Estimates',
@@ -46,7 +47,15 @@ Ext.define('Rally.technicalservices.PortfolioAlignmentSettings',{
     showDataLabels: true,
     dataLabelDistance: 1,
     dataLabelColor: 'black',
-
+    constructor: function(config){
+        Ext.apply(this,config);
+    },
+    _getScopeText: function(){
+        if (this.persistAllocationsByProject === true){
+            return 'Project';
+        }
+        return 'Workspace';
+    },
     setLegendColors: function(legendColorHash){
         legendColorHash[this.noneText] = this.noneColor;
       //  legendColorHash[this.otherText] = this.otherColor;
@@ -76,12 +85,17 @@ Ext.define('Rally.technicalservices.PortfolioAlignmentSettings',{
     },
     getChartTitle: function(chartType){
         if (this.chartType[chartType]){
+            if (chartType == 'targeted'){
+                return Ext.String.format(this.chartType[chartType].title || chartType, this._getScopeText());
+            }
             return this.chartType[chartType].title || chartType;
         }
         return chartType;
     },
     getToolTip: function(chartType, portfolioItemType){
-        var toolTip = Ext.String.format(this.chartType[chartType].toolTip || Ext.String.format("No tool tip found.",chartType), portfolioItemType);
+        var toolTip = Ext.String.format(this.chartType[chartType].toolTip || Ext.String.format("No tool tip found.",chartType), portfolioItemType, this._getScopeText());
+        if (chartType == 'targeted'){
+        }
         return Ext.String.format("<b>{0}</b>:  {1}",
             this.getChartTitle(chartType), toolTip);
     },
