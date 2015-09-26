@@ -487,7 +487,15 @@ Ext.define("PortfolioAlignment", {
             appId = this.getAppId();
         this.logger.log('_buildTargetDialog', release);
 
+        var releaseName = 'Unscheduled';
+        if (release){
+            releaseName = release.get('Name');
+        }
+        console.log('releaseName', releaseName, 'persistAllocationsByProject', this.chartSettings.persistAllocationsByProject);
+
         Ext.create('Rally.technicalservices.dialog.TargetAllocation', {
+            releaseName: releaseName,
+            persistAllocationsByProject: this.chartSettings.persistAllocationsByProject,
             targetAllocation: this.allocationPreferences.getAllocationHash(release),
             listeners: {
                 scope: this,
