@@ -3,11 +3,11 @@
 <head>
     <title>Portfolio Alignment</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Wed Aug 23 2017 17:54:42 GMT-0600 (MDT) -->
+    <!--  Build Date: Thu Aug 24 2017 08:34:03 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Wed Aug 23 2017 17:54:42 GMT-0600 (MDT)";
-        var CHECKSUM = 31738095245;
+        var APP_BUILD_DATE = "Thu Aug 24 2017 08:34:03 GMT-0600 (MDT)";
+        var CHECKSUM = 31896197931;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -183,7 +183,6 @@ Ext.define('Rally.technicalservices.preferences.Allocation',{
         var deferred = Ext.create('Deft.Deferred');
         this.allocationsByRelease = {};
         this.defaultHash = this._buildDefaultHash(targetValues);
-
         Rally.data.PreferenceManager.load({
             appID: appId,
             project: this.project,
@@ -192,6 +191,7 @@ Ext.define('Rally.technicalservices.preferences.Allocation',{
             success: function(prefs) {
                 if (prefs[portfolioItemType]){
                     this.allocationsByRelease = Ext.JSON.decode(prefs[portfolioItemType]);
+
                     this.logger.log('load preferences project',this.project, this.allocationsByRelease);
                 }
                 deferred.resolve();
@@ -241,7 +241,7 @@ Ext.define('Rally.technicalservices.preferences.Allocation',{
         var targetAllocationHash = {},
             numValidTargetValues = _.without(targetValues,"").length,
             defaultTargetAllocation = numValidTargetValues > 0 ? 100 / numValidTargetValues : 100;
-
+        this.logger.log('_buildDefaultHash', targetValues);
         Ext.each(targetValues, function(f){
             if (f && f.length > 0){
                 targetAllocationHash[f] = defaultTargetAllocation;
@@ -606,9 +606,10 @@ Ext.define("PortfolioAlignment", {
                         if (success){
                             var values = _.map(allowedValues, function(av){return av.get('StringValue')});
                             var i = 0;
-                            this.logger.log('AllowedValues ', values);
+
                             var legendColors = {};
-                            values.push(this.noneText);
+                            values.push(this.chartSettings.noneText);
+                            this.logger.log('AllowedValues ', values);
                             Ext.each(values, function(v){
                                 if (v && v.length > 0) {
                                     legendColors[v] = this.chartSettings.chartColors[i++];
