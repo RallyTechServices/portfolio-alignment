@@ -43,7 +43,6 @@ Ext.define('Rally.technicalservices.preferences.Allocation',{
         var deferred = Ext.create('Deft.Deferred');
         this.allocationsByRelease = {};
         this.defaultHash = this._buildDefaultHash(targetValues);
-
         Rally.data.PreferenceManager.load({
             appID: appId,
             project: this.project,
@@ -52,6 +51,7 @@ Ext.define('Rally.technicalservices.preferences.Allocation',{
             success: function(prefs) {
                 if (prefs[portfolioItemType]){
                     this.allocationsByRelease = Ext.JSON.decode(prefs[portfolioItemType]);
+
                     this.logger.log('load preferences project',this.project, this.allocationsByRelease);
                 }
                 deferred.resolve();
@@ -101,7 +101,7 @@ Ext.define('Rally.technicalservices.preferences.Allocation',{
         var targetAllocationHash = {},
             numValidTargetValues = _.without(targetValues,"").length,
             defaultTargetAllocation = numValidTargetValues > 0 ? 100 / numValidTargetValues : 100;
-
+        this.logger.log('_buildDefaultHash', targetValues);
         Ext.each(targetValues, function(f){
             if (f && f.length > 0){
                 targetAllocationHash[f] = defaultTargetAllocation;
