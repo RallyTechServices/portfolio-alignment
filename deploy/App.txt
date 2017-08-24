@@ -2,16 +2,22 @@
 <html>
 <head>
     <title>Portfolio Alignment</title>
-    <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Thu Aug 24 2017 08:34:03 GMT-0600 (MDT) -->
+    <!--  (c) 2017 CA Technologies.  All Rights Reserved. -->
+    <!--  Build Date: Thu Aug 24 2017 08:56:33 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Thu Aug 24 2017 08:34:03 GMT-0600 (MDT)";
-        var CHECKSUM = 31896197931;
+        var APP_BUILD_DATE = "Thu Aug 24 2017 08:56:33 GMT-0600 (MDT)";
+        var STORY    = "US1716";
+        var BUILDER  = "";
+        var CHECKSUM = 32302806461;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
-
+    <!-- our highcharts (needed so that we can add patterns) 
+    <script type="text/javascript" src="/apps/2.1/lib/analytics/analytics-all.js"></script>
+    -->
+    
+    
     <script type="text/javascript">
         Rally.onReady(function() {
              
