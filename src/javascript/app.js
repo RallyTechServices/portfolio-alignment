@@ -375,7 +375,9 @@ Ext.define("PortfolioAlignment", {
             model: portfolioItemType,
             fetch: fetch,
             context: context,
-            filters: filters
+            filters: filters,
+            limit: 'Infinity',
+            pageSize: 2000
         });
         store.load({
             callback: function(records, operation, success){
