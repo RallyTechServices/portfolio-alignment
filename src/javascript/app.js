@@ -135,6 +135,7 @@ Ext.define("PortfolioAlignment", {
                             var i = 0;
                             this.logger.log('AllowedValues ', values);
                             var legendColors = {};
+                            values.push(this.noneText);
                             Ext.each(values, function(v){
                                 if (v && v.length > 0) {
                                     legendColors[v] = this.chartSettings.chartColors[i++];

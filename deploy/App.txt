@@ -3,14 +3,14 @@
 <head>
     <title>Portfolio Alignment</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Sat Sep 26 2015 09:19:43 GMT-0600 (MDT) -->
+    <!--  Build Date: Wed Aug 23 2017 17:54:42 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Sat Sep 26 2015 09:19:43 GMT-0600 (MDT)";
-        var CHECKSUM = 33019916057;
+        var APP_BUILD_DATE = "Wed Aug 23 2017 17:54:42 GMT-0600 (MDT)";
+        var CHECKSUM = 31738095245;
     </script>
     
-    <script type="text/javascript" src="/apps/2.0/sdk.js"></script>
+    <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
 
     <script type="text/javascript">
         Rally.onReady(function() {
@@ -169,10 +169,10 @@ Ext.define('Rally.technicalservices.preferences.Allocation',{
             var startDate = Rally.util.DateTime.fromIsoString(release.get('ReleaseStartDate')),
                 endDate = Rally.util.DateTime.fromIsoString(release.get('ReleaseDate'));
 
-            var utcStartDate = Rally.util.DateTime.shiftTimezoneOffDate(startDate),
-                utcEndDate = Rally.util.DateTime.shiftTimezoneOffDate(endDate);
+            var utcStartDate = Rally.util.DateTime.toUtcIsoString(startDate),
+                utcEndDate = Rally.util.DateTime.toUtcIsoString(endDate);
 
-            var key =  Rally.util.DateTime.toIsoString(utcStartDate) + Rally.util.DateTime.toIsoString(utcEndDate) + release.get('Name');
+            var key =  utcStartDate + utcEndDate + release.get('Name');
             return key.substring(0,254);
         } else {
             return "Unscheduled";
@@ -251,28 +251,6 @@ Ext.define('Rally.technicalservices.preferences.Allocation',{
     }
 });
 
-/**
- * Created by kcorkan on 5/22/15.
- */
-Ext.override(Rally.app.AppSettings, {
-    _preferencesRetrieved: function(settings) {
-        console.log('_preferencesRetrieved');
-        this.isReady.canInvoke = true;
-
-        this.setSettings(Ext.apply({}, settings, this.settings));
-        this._injectTitleField();
-        this._drawForms();
-
-        this._drawAppScopedSettings();
-        if (this.settingsScope !== 'app' && !this._hasProjectPicker()) {
-            this._drawScopedSettings();
-        }
-        this._drawUserScopedSettings();
-        this._fireReady();
-
-        this._onAppSettingsReady();
-    }
-});
 Ext.define('Rally.technicalservices.PortfolioAlignmentSettings',{
 
     chartColors: [ '#2f7ed8', '#8bbc21', '#910000',
@@ -630,6 +608,7 @@ Ext.define("PortfolioAlignment", {
                             var i = 0;
                             this.logger.log('AllowedValues ', values);
                             var legendColors = {};
+                            values.push(this.noneText);
                             Ext.each(values, function(v){
                                 if (v && v.length > 0) {
                                     legendColors[v] = this.chartSettings.chartColors[i++];
