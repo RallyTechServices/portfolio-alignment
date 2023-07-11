@@ -69,6 +69,9 @@ Ext.define("PortfolioAlignment", {
                 filters: [{
                     property: 'Ordinal',
                     value: 0
+                },{
+                    property: 'Parent.Name',
+                    value: "Portfolio Item"
                 }]
             },
             listeners: {
@@ -118,7 +121,6 @@ Ext.define("PortfolioAlignment", {
         }
 
         this.logger.log('_loadCategories', this.portfolioItemType, targetField);
-
         Rally.data.wsapi.ModelFactory.getModel({
             type: this.portfolioItemType,
             context: {
@@ -130,6 +132,7 @@ Ext.define("PortfolioAlignment", {
                 field.getAllowedValueStore().load({
                     fetch: ['StringValue'],
                     callback: function(allowedValues, operation, success){
+                        console.log('callback',allowedValues, operation, success);
                         if (success){
                             var values = _.map(allowedValues, function(av){return av.get('StringValue')});
                             var i = 0;
@@ -515,7 +518,7 @@ Ext.define("PortfolioAlignment", {
      /* Overrides for App class
      /*
      /********************************************/
-    //getSettingsFields:  Override for App
+    // //getSettingsFields:  Override for App
     getSettingsFields: function() {
 
         return [{
@@ -523,8 +526,8 @@ Ext.define("PortfolioAlignment", {
             xtype: 'rallycheckboxfield',
             fieldLabel: 'Persist Allocations for Project',
             labelAlign: 'right',
-            labelWidth: 200,
-            readyEvent: 'afterrender'
+            labelWidth: 200   
+            //readyEvent: 'afterrender'
         }];
     },
 
@@ -544,7 +547,7 @@ Ext.define("PortfolioAlignment", {
 
       //  this._appSettings.addSettingsFields(this.getSettingsFields());
 
-        this._appSettings.on('cancel', this._hideSettings, this);
+        this._appSettings.on('cancel', this.hideSettings, this);
         this._appSettings.on('save', this._onSettingsSaved, this);
         if (this.isExternal()){
             if (this.down('#settings_box').getComponent(this._appSettings.id)==undefined){
@@ -558,7 +561,7 @@ Ext.define("PortfolioAlignment", {
     },
     _onSettingsSaved: function(settings){
         Ext.apply(this.settings, settings);
-        this._hideSettings();
+        this.hideSettings();
         this.onSettingsUpdate(settings);
     },
     onSettingsUpdate: function (settings){
